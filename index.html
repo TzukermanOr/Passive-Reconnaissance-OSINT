@@ -1,0 +1,1039 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>חקירת DNS ו-Recon פסיבי | n12.co.il</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Frank+Ruhl+Libre:wght@500;700;900&family=Assistant:wght@300;400;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0a0e14;
+  --bg-2:#0d131c;
+  --panel:#111927;
+  --panel-2:#0f1622;
+  --line:#1c2735;
+  --line-2:#26384c;
+  --text:#cdd9e5;
+  --text-dim:#8896a5;
+  --text-faint:#5b6b7c;
+  --cyan:#22d3ee;
+  --cyan-deep:#0891b2;
+  --cyan-glow:rgba(34,211,238,.14);
+  --green:#34d399;
+  --amber:#fbbf24;
+  --rose:#fb7185;
+  --violet:#a78bfa;
+  --mono:'JetBrains Mono',ui-monospace,monospace;
+  --serif:'Frank Ruhl Libre',serif;
+  --sans:'Assistant',sans-serif;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth;scroll-padding-top:90px}
+body{
+  background:var(--bg);
+  color:var(--text);
+  font-family:var(--sans);
+  font-weight:400;
+  line-height:1.75;
+  font-size:17px;
+  -webkit-font-smoothing:antialiased;
+  overflow-x:hidden;
+}
+body::before{
+  content:"";position:fixed;inset:0;z-index:0;pointer-events:none;
+  background:
+    radial-gradient(900px 500px at 85% -5%,rgba(34,211,238,.07),transparent 60%),
+    radial-gradient(700px 600px at 0% 100%,rgba(167,139,250,.05),transparent 60%);
+}
+body::after{
+  content:"";position:fixed;inset:0;z-index:0;pointer-events:none;opacity:.4;
+  background-image:linear-gradient(var(--line) 1px,transparent 1px),linear-gradient(90deg,var(--line) 1px,transparent 1px);
+  background-size:48px 48px;
+  -webkit-mask-image:radial-gradient(ellipse 80% 60% at 50% 0%,#000 30%,transparent 75%);
+  mask-image:radial-gradient(ellipse 80% 60% at 50% 0%,#000 30%,transparent 75%);
+}
+.wrap{position:relative;z-index:1;max-width:1000px;margin:0 auto;padding:0 24px}
+
+/* progress bar */
+#prog{position:fixed;top:0;right:0;height:3px;width:0;background:linear-gradient(90deg,var(--cyan),var(--violet));z-index:100;box-shadow:0 0 12px var(--cyan-glow)}
+
+/* top nav */
+nav.top{position:sticky;top:0;z-index:50;backdrop-filter:blur(12px);background:rgba(10,14,20,.78);border-bottom:1px solid var(--line)}
+nav.top .inner{max-width:1000px;margin:0 auto;padding:14px 24px;display:flex;align-items:center;justify-content:space-between;gap:16px}
+.brand{display:flex;align-items:center;gap:11px;font-family:var(--mono);font-size:13px;letter-spacing:.5px;color:var(--text-dim)}
+.brand .dot{width:9px;height:9px;border-radius:50%;background:var(--cyan);box-shadow:0 0 10px var(--cyan);animation:pulse 2.4s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+.brand b{color:var(--cyan)}
+nav.top .links{display:flex;gap:6px;font-family:var(--mono);font-size:12.5px}
+nav.top .links a{color:var(--text-faint);text-decoration:none;padding:5px 10px;border-radius:6px;transition:.2s}
+nav.top .links a:hover{color:var(--cyan);background:var(--cyan-glow)}
+@media(max-width:760px){nav.top .links{display:none}}
+
+/* hero */
+header.hero{position:relative;z-index:1;padding:90px 0 70px;text-align:center}
+.kick{display:inline-flex;align-items:center;gap:9px;font-family:var(--mono);font-size:12.5px;letter-spacing:1px;text-transform:uppercase;color:var(--cyan);border:1px solid var(--line-2);background:var(--panel);padding:7px 16px;border-radius:999px;margin-bottom:30px}
+.kick::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--cyan);box-shadow:0 0 8px var(--cyan)}
+header.hero h1{font-family:var(--serif);font-weight:900;font-size:clamp(40px,7vw,76px);line-height:1.04;letter-spacing:-.5px;color:#f1f6fb;margin-bottom:22px}
+header.hero h1 .accent{background:linear-gradient(120deg,var(--cyan),var(--violet));-webkit-background-clip:text;background-clip:text;color:transparent}
+header.hero .lead{max-width:640px;margin:0 auto 34px;font-size:19px;color:var(--text-dim);font-weight:300}
+.target-chip{display:inline-flex;align-items:center;gap:0;font-family:var(--mono);font-size:15px;border:1px solid var(--line-2);border-radius:10px;overflow:hidden;background:var(--panel)}
+.target-chip span{padding:9px 15px}
+.target-chip .lbl{background:var(--panel-2);color:var(--text-faint);font-size:12px;border-left:1px solid var(--line-2)}
+.target-chip .val{color:var(--cyan);font-weight:700}
+.meta-row{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:30px;font-family:var(--mono);font-size:12px;color:var(--text-faint)}
+.meta-row span{padding:5px 12px;border:1px solid var(--line);border-radius:7px;background:var(--panel-2)}
+
+/* section */
+section{position:relative;z-index:1;padding:48px 0}
+.sec-head{display:flex;align-items:baseline;gap:16px;margin-bottom:8px;border-bottom:1px solid var(--line);padding-bottom:18px}
+.sec-num{font-family:var(--mono);font-size:14px;color:var(--cyan-deep);font-weight:700;letter-spacing:1px}
+.sec-head h2{font-family:var(--serif);font-weight:700;font-size:clamp(26px,4vw,38px);color:#eaf2f9;line-height:1.15}
+.sec-sub{color:var(--text-dim);font-size:16.5px;margin:18px 0 28px;font-weight:300;max-width:740px}
+p{margin-bottom:16px}
+p .hl{color:var(--cyan);font-weight:600}
+p code,li code,.inline-code{font-family:var(--mono);font-size:.9em;background:var(--panel);border:1px solid var(--line);padding:1.5px 7px;border-radius:5px;color:var(--cyan);direction:ltr;display:inline-block}
+
+/* concept hierarchy */
+.hier{background:var(--panel-2);border:1px solid var(--line);border-radius:14px;padding:30px;margin:26px 0;direction:ltr;font-family:var(--mono)}
+.hier .row{display:flex;align-items:center;gap:14px;padding:11px 0;font-size:14px;position:relative}
+.hier .row:not(:last-child)::after{content:"";position:absolute;right:118px;bottom:-2px;width:1px;height:14px;background:var(--line-2)}
+.hier .tag{min-width:104px;text-align:left;font-size:11px;color:var(--text-faint);text-transform:uppercase;letter-spacing:.5px}
+.hier .seg{padding:6px 14px;border-radius:8px;border:1px solid var(--line-2);background:var(--panel);font-weight:500;font-size:15px}
+.hier .seg.tld{color:var(--rose);border-color:rgba(251,113,133,.3)}
+.hier .seg.ps{color:var(--amber);border-color:rgba(251,191,36,.3)}
+.hier .seg.apex{color:var(--cyan);border-color:var(--cyan-deep);background:var(--cyan-glow);box-shadow:0 0 18px rgba(34,211,238,.1)}
+.hier .seg.sub{color:var(--violet);border-color:rgba(167,139,250,.3)}
+.hier .desc{color:var(--text-dim);font-family:var(--sans);font-size:13.5px}
+
+/* ascii tree */
+.tree{background:#070b11;border:1px solid var(--line-2);border-radius:12px;padding:24px 26px;margin:24px 0;direction:ltr;font-family:var(--mono);font-size:14px;line-height:2;color:var(--text)}
+.tree .br{color:var(--text-faint)}
+.tree .l-root{color:var(--cyan);font-weight:700}
+.tree .l-tld{color:var(--rose)}
+.tree .l-sld{color:var(--amber)}
+.tree .l-reg{color:#7dd3fc;font-weight:600}
+.tree .l-sub{color:var(--violet)}
+.tree .ar{color:var(--text-faint)}
+
+/* definition cards */
+.defs{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:24px 0}
+@media(max-width:680px){.defs{grid-template-columns:1fr}}
+.def{background:var(--panel);border:1px solid var(--line);border-radius:13px;padding:18px 20px;border-right:3px solid var(--line-2);transition:.2s}
+.def:hover{border-right-color:var(--cyan)}
+.def .dt{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.def .dt .code{font-family:var(--mono);font-size:15px;font-weight:700;direction:ltr}
+.def .dt .en{font-family:var(--mono);font-size:11px;color:var(--text-faint);text-transform:uppercase;letter-spacing:.5px;margin-right:auto}
+.def p{font-size:14.5px;color:var(--text-dim);margin:0;line-height:1.65}
+.def.c-root{border-right-color:var(--cyan)} .def.c-root .code{color:var(--cyan)}
+.def.c-tld{border-right-color:var(--rose)} .def.c-tld .code{color:var(--rose)}
+.def.c-sld{border-right-color:var(--amber)} .def.c-sld .code{color:var(--amber)}
+.def.c-reg{border-right-color:#7dd3fc} .def.c-reg .code{color:#7dd3fc}
+.def.c-sub{border-right-color:var(--violet)} .def.c-sub .code{color:var(--violet)}
+
+/* phase flow */
+.phases{display:flex;flex-wrap:wrap;gap:0;margin:26px 0;direction:ltr;align-items:stretch}
+.phase{flex:1;min-width:130px;background:var(--panel);border:1px solid var(--line);padding:16px 14px;position:relative}
+.phase:first-child{border-radius:0 12px 12px 0}
+.phase:last-child{border-radius:12px 0 0 12px}
+.phase .pn{font-family:var(--mono);font-size:11px;color:var(--text-faint)}
+.phase .pt{font-family:var(--mono);font-size:13.5px;color:var(--text);font-weight:700;margin:5px 0}
+.phase .pd{font-size:12px;color:var(--text-dim);line-height:1.5}
+.phase.passive{border-color:rgba(52,211,153,.35);background:rgba(52,211,153,.05)}
+.phase.passive .pt{color:var(--green)}
+.phase.gated{border-color:rgba(251,113,133,.3);background:rgba(251,113,133,.05)}
+.phase.gated .pt{color:var(--rose)}
+.phase .lock{position:absolute;top:10px;left:12px;font-size:13px;color:var(--rose)}
+
+/* map row: finding -> action */
+.maprow{display:grid;grid-template-columns:1fr auto 1.3fr;gap:0;align-items:stretch;margin:10px 0;border:1px solid var(--line);border-radius:12px;overflow:hidden;direction:rtl}
+.maprow .f{padding:14px 18px;background:var(--panel-2);font-size:14.5px}
+.maprow .f b{color:var(--cyan);font-family:var(--mono);font-size:13px;direction:ltr;display:inline-block}
+.maprow .arrow2{display:flex;align-items:center;justify-content:center;padding:0 14px;color:var(--text-faint);background:var(--panel-2);font-size:18px;border-right:1px solid var(--line);border-left:1px solid var(--line)}
+.maprow .a{padding:14px 18px;background:var(--panel);font-size:14.5px;color:var(--text-dim)}
+@media(max-width:640px){.maprow{grid-template-columns:1fr;direction:rtl}.maprow .arrow2{transform:rotate(90deg);border:none;padding:4px 0}}
+
+/* chain */
+.chain{display:flex;flex-direction:column;gap:0;margin:26px 0;direction:ltr}
+.chain .node{display:flex;align-items:center;gap:16px}
+.chain .bullet{font-family:var(--mono);font-size:13px;color:var(--bg);background:var(--cyan);min-width:30px;height:30px;display:flex;align-items:center;justify-content:center;border-radius:8px;font-weight:700;flex-shrink:0}
+.chain .label{font-family:var(--mono);font-size:14px;color:var(--text)}
+.chain .label b{color:var(--cyan)}
+.chain .label small{display:block;font-family:var(--sans);color:var(--text-faint);font-size:12.5px}
+.chain .connector{width:30px;display:flex;justify-content:center;height:22px}
+.chain .connector::before{content:"";width:1px;background:var(--line-2)}
+
+/* step card */
+.step{background:var(--panel);border:1px solid var(--line);border-radius:16px;margin:30px 0;overflow:hidden;transition:.3s;opacity:0;transform:translateY(24px)}
+.step.in{opacity:1;transform:none}
+.step:hover{border-color:var(--line-2)}
+.step-top{display:flex;align-items:center;gap:16px;padding:20px 26px;border-bottom:1px solid var(--line);background:linear-gradient(180deg,var(--panel-2),transparent)}
+.step-badge{font-family:var(--mono);font-weight:700;font-size:15px;color:var(--bg);background:linear-gradient(135deg,var(--cyan),var(--cyan-deep));min-width:42px;height:42px;display:flex;align-items:center;justify-content:center;border-radius:11px;flex-shrink:0;box-shadow:0 0 18px var(--cyan-glow)}
+.step-top h3{font-family:var(--serif);font-weight:700;font-size:22px;color:#eaf2f9;line-height:1.2}
+.step-top .obj{font-size:13.5px;color:var(--text-dim);font-weight:300;margin-top:2px}
+.step-body{padding:8px 26px 26px}
+
+/* terminal */
+.term{background:#070b11;border:1px solid var(--line-2);border-radius:11px;margin:18px 0;overflow:hidden;direction:ltr}
+.term-bar{display:flex;align-items:center;gap:8px;padding:9px 14px;background:#0c1219;border-bottom:1px solid var(--line)}
+.term-bar .b{width:11px;height:11px;border-radius:50%}
+.term-bar .r{background:#ff5f56}.term-bar .y{background:#ffbd2e}.term-bar .g{background:#27c93f}
+.term-bar .name{margin-left:auto;font-family:var(--mono);font-size:11.5px;color:var(--text-faint)}
+.term-bar .copy{background:transparent;border:1px solid var(--line-2);color:var(--text-faint);font-family:var(--mono);font-size:11px;padding:3px 10px;border-radius:6px;cursor:pointer;transition:.2s}
+.term-bar .copy:hover{color:var(--cyan);border-color:var(--cyan-deep)}
+.term pre{padding:16px 18px;overflow-x:auto;font-family:var(--mono);font-size:13px;line-height:1.7;color:#b9c7d4}
+.term pre .cmt{color:#4f6478}
+.term pre .prompt{color:var(--green)}
+.term pre .flag{color:var(--amber)}
+.term pre .key{color:var(--cyan)}
+.term pre .str{color:#9fe6a0}
+.term pre .warn{color:var(--rose)}
+.term pre .dim{color:var(--text-faint)}
+
+/* result box */
+.box{border-radius:11px;padding:18px 20px;margin:18px 0;border:1px solid var(--line);position:relative}
+.box .bt{font-family:var(--mono);font-size:11.5px;letter-spacing:1px;text-transform:uppercase;font-weight:700;display:flex;align-items:center;gap:8px;margin-bottom:10px}
+.box .bt::before{content:"";width:7px;height:7px;border-radius:2px}
+.box.get{background:rgba(52,211,153,.05);border-color:rgba(52,211,153,.25)}
+.box.get .bt{color:var(--green)} .box.get .bt::before{background:var(--green)}
+.box.next{background:rgba(34,211,238,.05);border-color:rgba(34,211,238,.25)}
+.box.next .bt{color:var(--cyan)} .box.next .bt::before{background:var(--cyan)}
+.box.warn{background:rgba(251,191,36,.05);border-color:rgba(251,191,36,.25)}
+.box.warn .bt{color:var(--amber)} .box.warn .bt::before{background:var(--amber)}
+.box.risk{background:rgba(251,113,133,.05);border-color:rgba(251,113,133,.25)}
+.box.risk .bt{color:var(--rose)} .box.risk .bt::before{background:var(--rose)}
+.box ul{list-style:none;margin:0}
+.box li{padding:4px 0 4px 0;padding-right:20px;position:relative;font-size:15.5px}
+.box li::before{content:"";position:absolute;right:2px;top:13px;width:6px;height:6px;border-radius:50%;background:currentColor;opacity:.45}
+.box.get li,.box.next li,.box.warn li,.box.risk li{color:var(--text)}
+.box p:last-child{margin-bottom:0}
+
+/* findings table */
+.tbl{width:100%;border-collapse:collapse;margin:22px 0;font-size:14.5px;border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.tbl th,.tbl td{padding:13px 16px;text-align:right;border-bottom:1px solid var(--line)}
+.tbl th{background:var(--panel-2);font-family:var(--mono);font-size:12px;letter-spacing:.5px;color:var(--text-dim);text-transform:uppercase;font-weight:500}
+.tbl td:first-child{color:var(--text-dim);width:34%}
+.tbl td .v{font-family:var(--mono);font-size:13px;color:var(--cyan);direction:ltr;display:inline-block}
+.tbl tr:last-child td{border-bottom:none}
+.tbl tr:hover td{background:rgba(34,211,238,.025)}
+
+/* infra map */
+.infra{background:var(--panel-2);border:1px solid var(--line);border-radius:16px;padding:30px;margin:26px 0;direction:ltr;font-family:var(--mono);font-size:13.5px;line-height:1.95;color:var(--text)}
+.infra .root{color:var(--cyan);font-weight:700;font-size:16px}
+.infra .br{color:var(--text-faint)}
+.infra .leaf{color:var(--text)}
+.infra .note{color:var(--text-faint);font-family:var(--sans);font-size:12px}
+.infra .tag2{color:var(--amber)}
+.infra .tag3{color:var(--violet)}
+.infra .tag4{color:var(--green)}
+
+/* exercise */
+.mission{background:linear-gradient(160deg,var(--panel),var(--panel-2));border:1px solid var(--line-2);border-radius:18px;padding:34px;margin:30px 0;position:relative;overflow:hidden}
+.mission::before{content:"";position:absolute;top:-40px;left:-40px;width:160px;height:160px;background:radial-gradient(circle,var(--cyan-glow),transparent 70%)}
+.mission .mtag{font-family:var(--mono);font-size:12px;letter-spacing:1.5px;text-transform:uppercase;color:var(--violet);border:1px solid rgba(167,139,250,.3);padding:6px 14px;border-radius:999px;display:inline-block;margin-bottom:18px}
+.mission h3{font-family:var(--serif);font-weight:700;font-size:28px;color:#eaf2f9;margin-bottom:8px}
+.mission .targets{display:flex;gap:10px;flex-wrap:wrap;margin:20px 0}
+.mission .targets .t{font-family:var(--mono);font-size:13.5px;color:var(--cyan);background:var(--bg);border:1px solid var(--line-2);padding:8px 14px;border-radius:9px;direction:ltr}
+.tasklist{counter-reset:task;margin:20px 0;list-style:none}
+.tasklist li{counter-increment:task;position:relative;padding:14px 52px 14px 16px;border:1px solid var(--line);border-radius:11px;margin-bottom:10px;background:var(--bg);font-size:15.5px;transition:.2s}
+.tasklist li:hover{border-color:var(--cyan-deep)}
+.tasklist li::before{content:counter(task,decimal-leading-zero);position:absolute;right:16px;top:14px;font-family:var(--mono);font-size:13px;font-weight:700;color:var(--cyan);background:var(--cyan-glow);width:26px;height:26px;display:flex;align-items:center;justify-content:center;border-radius:7px}
+.tasklist li b{color:#eaf2f9}
+.deliverable{background:rgba(167,139,250,.06);border:1px dashed rgba(167,139,250,.35);border-radius:12px;padding:18px 20px;margin-top:22px}
+.deliverable .dh{font-family:var(--mono);font-size:12px;letter-spacing:1px;text-transform:uppercase;color:var(--violet);margin-bottom:8px;font-weight:700}
+
+/* callout ethics */
+.ethics{display:flex;gap:16px;align-items:flex-start;background:rgba(251,113,133,.05);border:1px solid rgba(251,113,133,.25);border-radius:14px;padding:22px 24px;margin:30px 0}
+.ethics .ic{font-family:var(--mono);font-size:22px;color:var(--rose);line-height:1}
+.ethics h4{font-family:var(--serif);font-size:19px;color:#f6dfe3;margin-bottom:6px}
+.ethics p{color:var(--text-dim);font-size:15px;margin:0}
+
+footer{position:relative;z-index:1;border-top:1px solid var(--line);margin-top:60px;padding:40px 0;text-align:center}
+footer .fbrand{font-family:var(--mono);color:var(--text-faint);font-size:13px;letter-spacing:.5px}
+footer .fbrand b{color:var(--cyan)}
+footer .fnote{color:var(--text-faint);font-size:13px;margin-top:10px;font-family:var(--sans)}
+
+.divider{height:1px;background:linear-gradient(90deg,transparent,var(--line-2),transparent);margin:8px 0}
+::selection{background:var(--cyan-deep);color:#04080d}
+*::-webkit-scrollbar{height:8px;width:8px}
+*::-webkit-scrollbar-thumb{background:var(--line-2);border-radius:4px}
+</style>
+</head>
+<body>
+<div id="prog"></div>
+
+<nav class="top">
+  <div class="inner">
+    <div class="brand"><span class="dot"></span>RECON_LAB · <b>DNS Intelligence</b></div>
+    <div class="links">
+      <a href="#concept">מבנה</a>
+      <a href="#whois">WHOIS</a>
+      <a href="#dns">DNS</a>
+      <a href="#enum">Enum</a>
+      <a href="#map">מפה</a>
+      <a href="#exploit">חולשות</a>
+      <a href="#mission">משימה</a>
+    </div>
+  </div>
+</nav>
+
+<header class="hero">
+  <div class="wrap">
+    <div class="kick">Passive Reconnaissance · OSINT</div>
+    <h1>חקירת תשתית של<br><span class="accent">דומיין ציבורי</span></h1>
+    <p class="lead">איך לוקחים שם דומיין אחד והופכים אותו למפת תשתית מלאה - בעלות, שרתי DNS, ספק, ASN, CDN, WAF ותעודות. הכל דרך מקורות פומביים בלבד.</p>
+    <div class="target-chip">
+      <span class="lbl">TARGET</span>
+      <span class="val">n12.co.il</span>
+    </div>
+    <div class="meta-row">
+      <span>11 שלבים</span>
+      <span>dig · whois · subfinder · curl · openssl</span>
+      <span>Passive / Zero-Touch</span>
+    </div>
+  </div>
+</header>
+
+<!-- ETHICS -->
+<div class="wrap">
+  <div class="ethics">
+    <div class="ic">&#9888;</div>
+    <div>
+      <h4>הערת אתיקה - לקרוא לפני שמתחילים</h4>
+      <p>כל הפעולות פה הן <b>Passive Recon</b> על מידע פומבי: WHOIS, רשומות DNS, תעודות TLS וכותרות HTTP שכל דפדפן מקבל ממילא. אין כאן ניצול חולשות, אין סריקת פורטים אגרסיבית, ואין גישה לא מורשית. ברגע שעוברים לסריקה אקטיבית או לניסיון גישה - חובה אישור כתוב מבעל הנכס. בחרנו ב-n12.co.il כי הוא נכס ציבורי גדול וכל המידע פה גלוי לכל.</p>
+    </div>
+  </div>
+</div>
+
+<!-- CONCEPT -->
+<section id="concept">
+  <div class="wrap">
+    <div class="sec-head"><span class="sec-num">00</span><h2>הבנת היעד: מה זה בכלל "root level domain"</h2></div>
+    <p class="sec-sub">לפני שמריצים פקודה אחת, צריך להבין את המבנה ההיררכי של השם. כל חקירה מתחילה מהשאלה: מה בעצם הדומיין שאני חוקר, ואיפה הוא יושב בעץ ה-DNS.</p>
+
+    <p>שם כמו <span class="inline-code">www.n12.co.il</span> נקרא משמאל לימין מהפרטי לכללי. כל נקודה מפרידה רמה בהיררכיה. זה נראה ככה:</p>
+
+    <div class="hier">
+      <div class="row"><span class="tag">Root</span><span class="seg">.</span><span class="desc">השורש האמיתי. שרתי ה-Root הגלובליים (13 קבוצות) - מהם מתחיל כל פתרון שם</span></div>
+      <div class="row"><span class="tag">TLD</span><span class="seg tld">il</span><span class="desc">סיומת מדינה (ccTLD) - ישראל. מנוהל ע"י ISOC-IL</span></div>
+      <div class="row"><span class="tag">Public Suffix</span><span class="seg tld">il</span><span class="seg ps">co</span><span class="desc">co.il = הרמה המסחרית. זה "Public Suffix" - לא ניתן לרשום אותו לבד</span></div>
+      <div class="row"><span class="tag">Apex / Root domain</span><span class="seg tld">il</span><span class="seg ps">co</span><span class="seg apex">n12</span><span class="desc">זה הדומיין שנרשם בפועל. ה-Apex / eTLD+1. כאן יושבת הבעלות</span></div>
+      <div class="row"><span class="tag">Subdomain</span><span class="seg tld">il</span><span class="seg ps">co</span><span class="seg apex">n12</span><span class="seg sub">www</span><span class="desc">תת-דומיין. אפשר ליצור אינסוף כאלה מתחת ל-Apex</span></div>
+    </div>
+
+    <div class="box warn">
+      <div class="bt">דיוק שחשוב להבין</div>
+      <p>בשפה יומיומית קוראים ל-<span class="inline-code">n12.co.il</span> "root domain" או "הדומיין הראשי", אבל הוא לא ה-Root של DNS. ה-Root האמיתי הוא הנקודה (<span class="inline-code">.</span>). השם המדויק לדבר שאנחנו חוקרים הוא <b>Apex domain</b> (או eTLD+1 / registrable domain). ההבחנה הזו קריטית: כש-subfinder מחזיר תתי-דומיינים, הוא מוצא דברים שמתחת ל-Apex - לא מתחת ל-Root.</p>
+    </div>
+
+    <p>למה זה משנה לחקירה? כי <span class="hl">ה-Apex הוא יחידת הבעלות</span>. ה-WHOIS, ה-Name Servers והתעודה הם של n12.co.il. כל מה שמתחת (www, m, brands) יורש מההגדרה הזו אבל יכול לשבת על תשתית שונה לגמרי - וזה בדיוק מה שנגלה.</p>
+
+    <p>אותו מבנה בייצוג עץ - מהשורש עד התת-דומיין:</p>
+    <div class="tree">
+<span class="l-root">.</span>                      <span class="br">&#8592; Root</span>
+<span class="br">&#9492;&#9472;&#9472;</span> <span class="l-tld">il</span>                 <span class="br">&#8592; TLD (Top Level Domain)</span>
+    <span class="br">&#9492;&#9472;&#9472;</span> <span class="l-sld">co</span>            <span class="br">&#8592; Second-Level (co.il = מסחרי)</span>
+        <span class="br">&#9492;&#9472;&#9472;</span> <span class="l-reg">n12</span>       <span class="br">&#8592; Registered Domain (Apex)</span>
+            <span class="br">&#9492;&#9472;&#9472;</span> <span class="l-sub">www</span>   <span class="br">&#8592; Subdomain</span>
+    </div>
+
+    <p>וזה הפירוק המלא של כל מונח - מה הוא, ומה אפשר לחקור בכל רמה:</p>
+    <div class="defs">
+      <div class="def c-root">
+        <div class="dt"><span class="code">.</span><span class="en">Root Domain</span></div>
+        <p>הבסיס של כל ה-DNS בעולם. מיוצג כנקודה ריקה. 13 קבוצות שרתי Root גלובליות. כל פתרון שם מתחיל מכאן ומאציל כלפי מטה. לא חוקרים אותו - מתחילים ממנו.</p>
+      </div>
+      <div class="def c-tld">
+        <div class="dt"><span class="code">.il</span><span class="en">TLD / Top Level</span></div>
+        <p>סיומת המדינה (ccTLD), מנוהלת ע"י ISOC-IL. דומיינים גנריים: .com .org .net. ה-TLD קובע מי הרשם המוסמך ואיפה ה-WHOIS נשמר. (זה ה-"high/top level domain").</p>
+      </div>
+      <div class="def c-sld">
+        <div class="dt"><span class="code">co.il</span><span class="en">Second-Level</span></div>
+        <p>בישראל יש קטגוריה ביניים: co=מסחרי, org=עמותות, gov=ממשלה, ac=אקדמיה. זה Public Suffix - אי אפשר לרשום אותו לבד. הוא קובע את חוקי הרישום.</p>
+      </div>
+      <div class="def c-reg">
+        <div class="dt"><span class="code">n12.co.il</span><span class="en">Registered / Apex</span></div>
+        <p>הדומיין שהארגון רשם בפועל (eTLD+1). כאן יושבת הבעלות, ה-Name Servers והתעודה. זו יחידת החקירה האמיתית - כל ממצא מודיעיני נתלה כאן.</p>
+      </div>
+      <div class="def c-sub">
+        <div class="dt"><span class="code">www.n12.co.il</span><span class="en">Subdomain</span></div>
+        <p>אינסוף תתי-דומיינים אפשריים מתחת ל-Apex: www, m (mobile), brands (מותגים), api, dev, staging. כל אחד יכול לשבת על שרת/ענן/צוות אחר - וזה משטח התקיפה.</p>
+      </div>
+      <div class="def">
+        <div class="dt"><span class="code" style="color:var(--text-dim)">FQDN</span><span class="en">Full Name</span></div>
+        <p>השם המלא והמוחלט מקצה לקצה כולל הנקודה הסופית: <span class="inline-code" style="direction:ltr">www.n12.co.il.</span> - זה מה ש-DNS פותר בפועל, רמה אחר רמה משמאל לימין.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CHAIN -->
+<section id="chain">
+  <div class="wrap">
+    <div class="sec-head"><span class="sec-num">01</span><h2>שרשרת הפתרון: DNS כמודיעין</h2></div>
+    <p class="sec-sub">DNS הוא לא "ספר טלפונים" אחד. הוא שרשרת האצלות (delegation). כל שרת לא בהכרח יודע את התשובה - אבל יודע למי להפנות. ההבנה הזו היא הבסיס לכל החקירה.</p>
+
+    <div class="chain">
+      <div class="node"><span class="bullet">.</span><span class="label"><b>Root Servers</b><small>"לא יודע מה זה .il, אבל הנה מי שאחראי על TLDs"</small></span></div>
+      <div class="connector"></div>
+      <div class="node"><span class="bullet">il</span><span class="label"><b>TLD Servers (.il)</b><small>"לא יודע מה זה n12, אבל הנה ה-Name Servers שאחראים עליו"</small></span></div>
+      <div class="connector"></div>
+      <div class="node"><span class="bullet">NS</span><span class="label"><b>Authoritative NS</b> · ns1/2/3.bezeqint.net<small>"אני סמכותי על n12.co.il. הנה הרשומה הסופית."</small></span></div>
+      <div class="connector"></div>
+      <div class="node"><span class="bullet">&#10003;</span><span class="label"><b>Final Record</b> · A / MX / CNAME / TXT<small>התשובה הסופית - כתובת IP, שרת מייל, או הפניה</small></span></div>
+    </div>
+
+    <p>בכל פעם שנשאל שאלה לאורך השרשרת הזו, נחלץ פיסת מודיעין: מי מנהל את ה-DNS, איפה הוא יושב פיזית, לאיזה ספק הוא שייך, ואיך הנכס מוגן.</p>
+
+    <div class="box warn">
+      <div class="bt">לסגור את הלולאה - איך באמת הולכים מהשורש</div>
+      <p>בחקירה הראשונית התחלנו באמצע - שאלנו ישירות שרת סמכותי. כדי לראות את כל השרשרת מהשורש כלפי מטה (Root &#8594; .il &#8594; authoritative) משתמשים ב-<span class="inline-code">dig +trace</span>. שימו לב למלכודת: אם הריצה מחזירה רק <span class="inline-code">Received 28 bytes from 127.0.0.53</span> ועוצרת - זה כי המערכת מוגדרת עם <b>systemd-resolved stub</b> ב-127.0.0.53, ו-trace חייב לדבר ישירות עם שרתי ה-Root. הפתרון: לכוון ל-resolver אמיתי.</p>
+      <div class="term" style="margin-top:14px">
+        <div class="term-bar"><span class="b r"></span><span class="b y"></span><span class="b g"></span><span class="name">trace נכון</span><button class="copy">העתק</button></div>
+<pre><span class="prompt">$</span> dig <span class="flag">+trace</span> n12.co.il <span class="flag">@8.8.8.8</span>
+<span class="cmt">; .        -> a.root-servers.net ...   (Root)</span>
+<span class="cmt">; il.      -> ns NS for .il TLD        (TLD)</span>
+<span class="cmt">; n12.co.il -> ns1/2/3.bezeqint.net    (Authoritative)</span></pre>
+      </div>
+      <p style="margin-top:12px">בונוס: trace מהשורש חושף גם את סטטוס ה-DNSSEC בכל רמה. ה-WHOIS שלנו הראה <span class="inline-code">DNSSEC: unsigned</span> ל-n12 - וזה ממצא בפני עצמו (נחזור אליו בפרק החולשות).</p>
+    </div>
+  </div>
+</section>
+
+<div class="divider wrap" style="max-width:1000px;margin:0 auto;padding:0 24px"></div>
+
+<!-- STEP 1 WHOIS -->
+<section id="whois">
+  <div class="wrap">
+    <div class="sec-head"><span class="sec-num">02</span><h2>שלב אחר שלב: החקירה המלאה</h2></div>
+    <p class="sec-sub">לכל שלב: המטרה, הפקודה המדויקת, הפלט, מה קיבלנו ממנו, ואיך ממשיכים. עוקבים אחרי השרשרת מלמעלה למטה.</p>
+
+    <div class="step">
+      <div class="step-top"><span class="step-badge">01</span><div><h3>WHOIS - מי הבעלים</h3><div class="obj">מטרה: לזהות בעלות, רשם (registrar) ומי מנהל את ה-DNS</div></div></div>
+      <div class="step-body">
+        <div class="term">
+          <div class="term-bar"><span class="b r"></span><span class="b y"></span><span class="b g"></span><span class="name">whois</span><button class="copy">העתק</button></div>
+<pre><span class="prompt">$</span> whois n12.co.il</pre>
+        </div>
+        <div class="term">
+          <div class="term-bar"><span class="b r"></span><span class="b y"></span><span class="b g"></span><span class="name">output</span><button class="copy">העתק</button></div>
+<pre><span class="dim">descr:</span>      Keshet Broadcasting LTD
+<span class="dim">descr:</span>      12 Raul Valenburg St., Tel Aviv
+<span class="key">nserver:</span>   ns1.bezeqint.net
+<span class="key">nserver:</span>   ns2.bezeqint.net
+<span class="key">nserver:</span>   ns3.bezeqint.net
+<span class="dim">assigned:</span>  10-10-2019   <span class="cmt"># validity 2027</span>
+<span class="dim">status:</span>    Transfer Locked
+<span class="dim">registrar:</span> Domain The Net Technologies Ltd</pre>
+        </div>
+        <div class="box get">
+          <div class="bt">מה קיבלנו</div>
+          <ul>
+            <li><b>בעלות:</b> הדומיין שייך ל-Keshet Broadcasting (קבוצת קשת / ערוץ 12)</li>
+            <li><b>Registrar:</b> Domain The Net Technologies - דרכו נרשם הדומיין</li>
+            <li><b>Name Servers:</b> ns1/2/3.bezeqint.net - ה-DNS מנוהל ע"י בזק בינלאומי, לא בבית</li>
+            <li><b>Transfer Locked:</b> נעילת העברה פעילה - הגנה תקנית מפני חטיפת דומיין</li>
+          </ul>
+        </div>
+        <div class="box next">
+          <div class="bt">איך ממשיכים</div>
+          <p>ה-Name Servers הם החוט הבא למשוך. הם מצביעים על <span class="inline-code">bezeqint.net</span> - אז נחקור את שרתי ה-DNS עצמם, נמצא את ה-IP שלהם, וממנו נגיע לספק ולרשת.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- STEP 2 -->
+    <div class="step" id="dns">
+      <div class="step-top"><span class="step-badge">02</span><div><h3>Authoritative Name Servers</h3><div class="obj">מטרה: לאמת מי השרתים הסמכותיים בפועל (לא רק מה ש-WHOIS אומר)</div></div></div>
+      <div class="step-body">
+        <div class="term">
+          <div class="term-bar"><span class="b r"></span><span class="b y"></span><span class="b g"></span><span class="name">dig NS</span><button class="copy">העתק</button></div>
+<pre><span class="prompt">$</span> dig <span class="key">NS</span> bezeqint.net</pre>
+        </div>
+        <div class="term">
+          <div class="term-bar"><span class="b r"></span><span class="b y"></span><span class="b g"></span><span class="name">answer</span><button class="copy">העתק</button></div>
+<pre><span class="cmt">;; ANSWER SECTION:</span>
+bezeqint.net.  60  IN  <span class="key">NS</span>  ns1.bezeqint.net.
+bezeqint.net.  60  IN  <span class="key">NS</span>  ns2.bezeqint.net.
+bezeqint.net.  60  IN  <span class="key">NS</span>  ns3.bezeqint.net.</pre>
+        </div>
+        <div class="box get">
+          <div class="bt">מה קיבלנו</div>
+          <ul>
+            <li>אישור עצמאי שלשלושת ה-NS מנהלים את התשתית</li>
+            <li>ה-NS יושבים על דומיין נפרד (bezeqint.net) - הפרדה תקנית בין הנכס לתשתית</li>
+          </ul>
+        </div>
+        <div class="box warn">
+          <div class="bt">טעות נפוצה להימנע ממנה</div>
+          <p>הרצת <span class="inline-code">dig NS ns3.bezeqint.net</span> תחזיר SOA ולא NS - כי <b>host בודד אינו zone</b>. רשומת NS קיימת רק ל-zone שלם (bezeqint.net), לא לרשומת host יחידה בתוכו. כדי לקבל את ה-IP של ה-host שואלים <span class="inline-code">A</span>, לא <span class="inline-code">NS</span>.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- STEP 3 -->
+    <div class="step">
+      <div class="step-top"><span class="step-badge">03</span><div><h3>הפיכת שם DNS ל-IP אמיתי</h3><div class="obj">מטרה: לאתר את הכתובת הפיזית שעליה יושב שרת ה-DNS</div></div></div>
+      <div class="step-body">
+        <div class="term">
+          <div class="term-bar"><span class="b r"></span><span class="b y"></span><span class="b g"></span><span class="name">dig A</span><button class="copy">העתק</button></div>
+<pre><span class="prompt">$</span> dig <span class="key">A</span> ns3.bezeqint.net</pre>
+        </div>
+        <div class="term">
+          <div class="term-bar"><span class="b r"></span><span class="b y"></span><span class="b g"></span><span class="name">answer</span><button class="copy">העתק</button></div>
+<pre><span class="cmt">;; ANSWER SECTION:</span>
+ns3.bezeqint.net.  5  IN  <span class="key">A</span>  <span class="str">192.115.132.132</span></pre>
+        </div>
+        <div class="box get">
+          <div class="bt">מה קיבלנו</div>
+          <p>כתובת IP ממשית של שרת DNS: <span class="inline-code">192.115.132.132</span>. זה נכס מודיעיני - מ-IP אפשר להגיע לבעלות הרשת, ל-ASN ולמיקום.</p>
+        </div>
+        <div class="box next">
+          <div class="bt">איך ממשיכים</div>
+          <p>שתי דרכים: (1) WHOIS על ה-IP כדי לזהות בעל הרשת ו-ASN. (2) לשאול את השרת הסמכותי <b>ישירות</b> מה הוא יודע על n12.co.il, ולעקוף caching.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- STEP 4 -->
+    <div class="step">
+      <div class="step-top"><span class="step-badge">04</span><div><h3>שאילתה ישירה לשרת הסמכותי</h3><div class="obj">מטרה: לקבל את רשומת ה-A של היעד מהמקור, בלי cache ביניים</div></div></div>
+      <div class="step-body">
+        <div class="term">
+          <div class="term-bar"><span class="b r"></span><span class="b y"></span><span class="b g"></span><span class="name">nslookup @ns</span><button class="copy">העתק</button></div>
+<pre><span class="prompt">$</span> nslookup n12.co.il <span class="flag">192.115.132.132</span>
+Name:    n12.co.il
+Address: <span class="str">66.22.84.58</span></pre>
+        </div>
+        <div class="box get">
+          <div class="bt">מה קיבלנו - וכאן מתחיל החלק המעניין</div>
+          <ul>
+            <li>ה-Apex עצמו (n12.co.il) פותר ל-<span class="inline-code">66.22.84.58</span></li>
+            <li>שימו לב: בהמשך נגלה ש-<b>www</b> יושב על IP אחר לגמרי (Akamai). כלומר ה-Apex וה-www לא על אותה תשתית</li>
+          </ul>
+        </div>
+        <div class="box risk">
+          <div class="bt">דגל לחקירה נוספת</div>
+          <p>הבלוק <span class="inline-code">66.22.84.0/24</span> אינו של בזק. זה מרמז על שכבת הגנה / WAF נפרדת מול ה-Apex. אל תניחו ספק לפי הזיכרון - הצעד הנכון הוא <span class="inline-code">whois 66.22.84.58</span> כדי לאמת מי מחזיק את הרשת לפני שקובעים מסקנה.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- STEP 5 -->
+    <div class="step" id="asn">
+      <div class="step-top"><span class="step-badge">05</span><div><h3>RIPE WHOIS + ASN</h3><div class="obj">מטרה: למפות את ה-IP לבעל רשת, ל-ASN ולמיקום גיאוגרפי</div></div></div>
+      <div class="step-body">
+        <div class="term">
+          <div class="term-bar"><span class="b r"></span><span class="b y"></span><span class="b g"></span><span class="name">whois IP</span><button class="copy">העתק</button></div>
+<pre><span class="prompt">$</span> whois 192.115.132.132</pre>
+        </div>
+        <div class="term">
+          <div class="term-bar"><span class="b r"></span><span class="b y"></span><span class="b g"></span><span class="name">RIPE</span><button class="copy">העתק</button></div>
+<pre><span class="key">inetnum:</span>  192.115.128.0 - 192.115.135.255
+<span class="key">netname:</span>  IL-BEZEQ-INTERNATIONAL
+<span class="key">org:</span>      Bezeq International Ltd.
+<span class="key">country:</span>  IL
+<span class="key">origin:</span>   <span class="str">AS8551</span>   <span class="cmt"># Bezeq International</span>
+<span class="dim">abuse-c:</span>  abuse@bezeqint.net</pre>
+        </div>
+        <div class="box get">
+          <div class="bt">מה קיבלנו</div>
+          <ul>
+            <li><b>בלוק רשת:</b> 192.115.128.0 - 192.115.135.255 (/21) שייך לבזק בינלאומי</li>
+            <li><b>ASN:</b> AS8551 - המספר הזה הוא "תעודת הזהות" של הרשת באינטרנט הגלובלי</li>
+            <li><b>Abuse contact + מיקום:</b> פתח תקווה, ישראל - מידע ארגוני</li>
+          </ul>
+        </div>
+        <div class="box next">
+          <div class="bt">מה ASN פותח לנו</div>
+          <p>עם AS8551 אפשר לשאול שירותי BGP (כמו bgp.he.net) לכל הבלוקים שהספק מכריז עליהם, את ה-Peering, ולמפות את כל טווחי ה-IP שתחת אותו ארגון. זה מרחיב חקירה מ-IP בודד לתשתית שלמה.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- STEP 6 -->
+    <div class="step">
+      <div class="step-top"><span class="step-badge">06</span><div><h3>Reverse DNS (PTR)</h3><div class="obj">מטרה: מ-IP חזרה ל-hostname, וגילוי איך מואצל ה-Reverse zone</div></div></div>
+      <div class="step-body">
+        <div class="term">
+          <div class="term-bar"><span class="b r"></span><span class="b y"></span><span class="b g"></span><span class="name">dig -x</span><button class="copy">העתק</button></div>
+<pre><span class="prompt">$</span> dig <span class="flag">-x</span> 192.115.132.132
+<span class="cmt">;; ANSWER:</span>
+132.132.115.192.in-addr.arpa. <span class="key">PTR</span> ns3.bezeqint.net.
+<span class="cmt">;; AUTHORITY (reverse zone delegated to):</span>
+  accend.actcom.co.il.
+  ns1.actcom.net.il.</pre>
+        </div>
+        <div class="box get">
+          <div class="bt">מה קיבלנו</div>
+          <ul>
+            <li><b>PTR תקין:</b> ה-IP חוזר ל-ns3.bezeqint.net (חשוב למוניטין SMTP)</li>
+            <li><b>מבנה ה-Reverse:</b> ה-IP נכתב הפוך תחת <span class="inline-code">in-addr.arpa</span></li>
+            <li><b>האצלה מעניינת:</b> ה-Reverse zone מואצל ל-actcom - כלומר ניהול ה-PTR נפרד מניהול ה-Forward DNS</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- STEP 7 MX -->
+    <div class="step">
+      <div class="step-top"><span class="step-badge">07</span><div><h3>MX - תצורת דואר</h3><div class="obj">מטרה: לבדוק אם ל-Apex יש שרת מייל ומאיפה</div></div></div>
+      <div class="step-body">
+        <div class="term">
+          <div class="term-bar"><span class="b r"></span><span class="b y"></span><span class="b g"></span><span class="name">dig MX</span><button class="copy">העתק</button></div>
+<pre><span class="prompt">$</span> dig <span class="key">MX</span> n12.co.il
+<span class="cmt">;; -> status: NOERROR, ANSWER: 0</span>
+<span class="cmt">;; AUTHORITY SECTION:</span>
+n12.co.il. 300 IN <span class="key">SOA</span> ns1.bezeqint.net.
+           hostmaster.<span class="warn">keshet.dom</span>. 2020101201 ...</pre>
+        </div>
+        <div class="box get">
+          <div class="bt">מה קיבלנו</div>
+          <ul>
+            <li><b>אין MX:</b> ל-n12.co.il אין שרת דואר. הוא לא domain של מייל</li>
+            <li>הדואר כנראה יושב על דומיין אחר (mako.co.il / keshet.tv) - תואם ל-WHOIS שהראה כתובות mako.co.il</li>
+            <li><b>פנינה ב-SOA:</b> איש הקשר הוא <span class="inline-code">hostmaster.keshet.dom</span> - הסיומת <span class="inline-code">.dom</span> הפנימית חושפת מוסכמת שיום (naming convention) פנימית של הארגון</li>
+          </ul>
+        </div>
+        <div class="box warn">
+          <div class="bt">למה dig ANY נתקע</div>
+          <p>השאילתה <span class="inline-code">dig ANY</span> נחסמת או מוחזרת חלקית ע"י רוב השרתים המודרניים (RFC 8482) כדי למנוע <b>DNS amplification attacks</b>. אל תסתמכו עליה - שאלו כל סוג רשומה בנפרד.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- STEP 8 ENUM -->
+    <div class="step" id="enum">
+      <div class="step-top"><span class="step-badge">08</span><div><h3>Subdomain Enumeration</h3><div class="obj">מטרה: לגלות את משטח התקיפה - כל תתי-הדומיינים שמתחת ל-Apex</div></div></div>
+      <div class="step-body">
+        <div class="term">
+          <div class="term-bar"><span class="b r"></span><span class="b y"></span><span class="b g"></span><span class="name">subfinder</span><button class="copy">העתק</button></div>
+<pre><span class="prompt">$</span> subfinder <span class="flag">-d</span> n12.co.il</pre>
+        </div>
+        <div class="term">
+          <div class="term-bar"><span class="b r"></span><span class="b y"></span><span class="b g"></span><span class="name">found: 13</span><button class="copy">העתק</button></div>
+<pre>www.n12.co.il          m.n12.co.il
+brands.n12.co.il       special.n12.co.il
+glglz.n12.co.il        bestbeach.n12.co.il
+october7th.n12.co.il   kipur.n12.co.il
+independenceday.n12.co.il
+kidnappedfromisrael.n12.co.il
+memorieswall.n12.co.il  memorieswallform.n12.co.il
+ironswordslist.n12.co.il</pre>
+        </div>
+        <div class="box get">
+          <div class="bt">מה קיבלנו</div>
+          <ul>
+            <li>13 תתי-דומיינים - חלקם תשתית (www, m), חלקם קמפיינים ומיני-אתרים תוכניים</li>
+            <li>כל subdomain עלול לשבת על שרת אחר, CDN אחר, ענן אחר או צוות פיתוח אחר</li>
+            <li>תתי-דומיינים ישנים של קמפיינים הם לעתים נקודת תורפה - קוד לא מתוחזק</li>
+          </ul>
+        </div>
+        <div class="box next">
+          <div class="bt">איך ממשיכים - חי מהמקרה הזה</div>
+          <p>בתיעוד המקורי הריצו <span class="inline-code">cat subdomains.txt | httpx</span> אבל הקובץ לא היה קיים. הסדר הנכון: לשמור פלט לקובץ, ואז להעביר ל-httpx לזיהוי שרתים חיים, כותרות וטכנולוגיות.</p>
+          <div class="term" style="margin-top:14px">
+            <div class="term-bar"><span class="b r"></span><span class="b y"></span><span class="b g"></span><span class="name">pipeline נכון</span><button class="copy">העתק</button></div>
+<pre><span class="prompt">$</span> subfinder <span class="flag">-d</span> n12.co.il <span class="flag">-silent</span> &gt; subs.txt
+<span class="prompt">$</span> cat subs.txt | httpx <span class="flag">-title -status-code -tech-detect</span></pre>
+          </div>
+          <p style="margin-top:12px">שימו לב לתחביר הדגלים של httpx: דגל ארוך עם <span class="inline-code">-</span> בודד (לא <span class="inline-code">-t</span>). שגיאת ה-"No such option: -t" בתיעוד נבעה מקיצור שגוי.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- STEP 9 CNAME -->
+    <div class="step">
+      <div class="step-top"><span class="step-badge">09</span><div><h3>CNAME - גילוי CDN</h3><div class="obj">מטרה: לזהות אם היעד מסתתר מאחורי רשת הפצת תוכן</div></div></div>
+      <div class="step-body">
+        <div class="term">
+          <div class="term-bar"><span class="b r"></span><span class="b y"></span><span class="b g"></span><span class="name">dig CNAME</span><button class="copy">העתק</button></div>
+<pre><span class="prompt">$</span> dig <span class="key">CNAME</span> www.n12.co.il
+www.n12.co.il. <span class="key">CNAME</span> www.n12.co.il.<span class="str">edgekey.net</span>.
+www.n12.co.il.edgekey.net. <span class="key">CNAME</span> e36725.b.<span class="str">akamaiedge.net</span>.</pre>
+        </div>
+        <div class="box get">
+          <div class="bt">מה קיבלנו</div>
+          <ul>
+            <li><b>CDN:</b> www עובר דרך <span class="inline-code">edgekey.net</span> ו-<span class="inline-code">akamaiedge.net</span> - חתימה ברורה של <b>Akamai</b></li>
+            <li>משמעות: ה-IP שתראו ל-www הוא של Akamai, לא של שרת המקור (origin). ה-origin מוסתר</li>
+            <li>זיהוי CDN לפי סיומת CNAME: edgekey/akamaiedge=Akamai, cloudfront=AWS, fastly=Fastly, cloudflare=Cloudflare</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- STEP 10 HEADERS -->
+    <div class="step">
+      <div class="step-top"><span class="step-badge">10</span><div><h3>HTTP Headers</h3><div class="obj">מטרה: לחלץ מודיעין על השרת, ה-CDN וה-WAF מתוך תגובת HTTP</div></div></div>
+      <div class="step-body">
+        <div class="term">
+          <div class="term-bar"><span class="b r"></span><span class="b y"></span><span class="b g"></span><span class="name">curl -I</span><button class="copy">העתק</button></div>
+<pre><span class="prompt">$</span> curl <span class="flag">-I</span> https://www.n12.co.il
+<span class="key">HTTP/2</span> 200
+<span class="key">x-cdn:</span> Akamai
+<span class="key">akamai-cache-status:</span> Hit from child
+<span class="key">x-powered-by-mako-render:</span> WS2 ...
+<span class="key">mako-server:</span> WVAP06
+<span class="key">rdwr_response:</span> allowed
+<span class="key">strict-transport-security:</span> max-age=16070400</pre>
+        </div>
+        <div class="box get">
+          <div class="bt">מה קיבלנו - שלוש שכבות נחשפו</div>
+          <ul>
+            <li><b>CDN:</b> <span class="inline-code">x-cdn: Akamai</span> + cache-status מאשרים את ה-Akamai מהשלב הקודם</li>
+            <li><b>אפליקציה:</b> <span class="inline-code">mako-server</span> / <span class="inline-code">x-powered-by-mako-render</span> - מנוע התוכן הפנימי של mako (פלטפורמת קשת)</li>
+            <li><b>WAF / Load Balancer:</b> <span class="inline-code">rdwr_response</span> הוא חתימה של <b>Radware</b> - שכבת הגנה אקטיבית</li>
+            <li><b>היגיינת אבטחה:</b> HSTS מוגדר - תקין ומומלץ</li>
+          </ul>
+        </div>
+        <div class="box warn">
+          <div class="bt">מה היינו רוצים לראות (ולא ראינו)</div>
+          <p>אין כאן <span class="inline-code">X-Powered-By: PHP/7.2</span> או גרסת שרת חשופה. אם כן היו - זה דגל לטכנולוגיה ישנה ופגיעה. כותרות שמדליפות גרסאות הן ממצא חשוב בכל דוח recon.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- STEP 11 TLS -->
+    <div class="step">
+      <div class="step-top"><span class="step-badge">11</span><div><h3>TLS Certificate</h3><div class="obj">מטרה: לחלץ מודיעין מהתעודה - ארגון, רשות אישור, וכיסוי wildcard</div></div></div>
+      <div class="step-body">
+        <div class="term">
+          <div class="term-bar"><span class="b r"></span><span class="b y"></span><span class="b g"></span><span class="name">openssl s_client</span><button class="copy">העתק</button></div>
+<pre><span class="prompt">$</span> openssl s_client <span class="flag">-connect</span> www.n12.co.il:443
+Connecting to <span class="str">95.101.123.99</span>   <span class="cmt"># Akamai edge IP</span>
+subject= CN=<span class="key">*.n12.co.il</span>
+         O=Keshet Broadcasting Ltd, L=Tel Aviv-Yafo
+issuer = DigiCert Global G3 TLS ECC SHA384 2020 CA1
+SAN: *.n12.co.il, n12.co.il
+Valid: Feb 2026 -> Feb 2027
+Protocol: <span class="key">TLSv1.3</span>  Cipher: TLS_AES_256_GCM_SHA384</pre>
+        </div>
+        <div class="box get">
+          <div class="bt">מה קיבלנו</div>
+          <ul>
+            <li><b>Wildcard:</b> תעודת <span class="inline-code">*.n12.co.il</span> - תקפה לכל תת-דומיין. מסביר למה כל ה-subs עובדים תחת HTTPS</li>
+            <li><b>ארגון מאומת:</b> Keshet Broadcasting Ltd, Tel Aviv-Yafo - מאשר את הבעלות מה-WHOIS</li>
+            <li><b>CA:</b> DigiCert (G3 ECC) - רשות אישור מסחרית מובילה</li>
+            <li><b>IP אמיתי של edge:</b> 95.101.123.99 - בלוק של Akamai, שונה מה-66.22.84.58 של ה-Apex (חיזוק להפרדת התשתית)</li>
+            <li><b>TLS 1.3 בלבד:</b> תצורה מודרנית ומאובטחת</li>
+          </ul>
+        </div>
+        <div class="box next">
+          <div class="bt">איך ממשיכים מהתעודה</div>
+          <p>תעודות הן מכרה זהב ל-subdomain discovery דרך <b>Certificate Transparency logs</b> (crt.sh). אם ארגון הנפיק תעודות ל-hostnames ספציפיים (לא רק wildcard), הם נרשמים פומבית - וזו דרך פסיבית לגלות תתי-דומיינים שלא הופיעו ב-subfinder.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- SUMMARY TABLE -->
+<section>
+  <div class="wrap">
+    <div class="sec-head"><span class="sec-num">03</span><h2>טבלת ממצאים מרוכזת</h2></div>
+    <p class="sec-sub">כל מה שחילצנו ממקור פומבי בלבד, במבט אחד.</p>
+    <table class="tbl">
+      <tr><th>שכבה</th><th>ממצא</th></tr>
+      <tr><td>בעלות (Owner)</td><td><span class="v">Keshet Broadcasting Ltd</span></td></tr>
+      <tr><td>Registrar</td><td><span class="v">Domain The Net Technologies</span></td></tr>
+      <tr><td>Authoritative DNS</td><td><span class="v">ns1/2/3.bezeqint.net</span></td></tr>
+      <tr><td>ספק DNS / רשת</td><td><span class="v">Bezeq International · AS8551</span></td></tr>
+      <tr><td>IP של ה-Apex</td><td><span class="v">66.22.84.58 (שכבת הגנה נפרדת)</span></td></tr>
+      <tr><td>CDN של www</td><td><span class="v">Akamai (edgekey / akamaiedge)</span></td></tr>
+      <tr><td>WAF / LB</td><td><span class="v">Radware (rdwr_response)</span></td></tr>
+      <tr><td>שכבת אפליקציה</td><td><span class="v">mako render engine</span></td></tr>
+      <tr><td>TLS</td><td><span class="v">DigiCert · *.n12.co.il · TLS 1.3</span></td></tr>
+      <tr><td>דואר (MX)</td><td><span class="v">אין - לא domain של מייל</span></td></tr>
+      <tr><td>תתי-דומיינים</td><td><span class="v">13 שנמצאו (www, m, brands, קמפיינים)</span></td></tr>
+    </table>
+  </div>
+</section>
+
+<!-- INFRA MAP -->
+<section id="map">
+  <div class="wrap">
+    <div class="sec-head"><span class="sec-num">04</span><h2>מפת תשתית - מה שבנינו</h2></div>
+    <p class="sec-sub">המסר המרכזי: Recon הוא לא "למצוא IP". Recon הוא להבין ארכיטקטורה. הנה התמונה ששרשרת השלבים הרכיבה.</p>
+    <div class="infra">
+<span class="root">Keshet Broadcasting (n12.co.il)</span>
+<span class="br">│</span>
+<span class="br">├──</span> <span class="tag2">DNS</span> &#8594; Bezeq International (AS8551)
+<span class="br">│        └─</span> ns1/2/3.bezeqint.net <span class="note">// Forward zone</span>
+<span class="br">│        └─</span> actcom <span class="note">// Reverse zone delegation</span>
+<span class="br">│</span>
+<span class="br">├──</span> <span class="tag3">Apex</span> (n12.co.il) &#8594; 66.22.84.58 <span class="note">// שכבת הגנה נפרדת - לאמת</span>
+<span class="br">│</span>
+<span class="br">├──</span> <span class="tag4">Web (www / m)</span> &#8594; Akamai CDN &#8594; 95.101.123.99
+<span class="br">│        └─</span> WAF: Radware
+<span class="br">│        └─</span> App: mako render engine
+<span class="br">│        └─</span> TLS: DigiCert *.n12.co.il (TLS 1.3)
+<span class="br">│</span>
+<span class="br">├──</span> <span class="tag3">Subdomains</span> (13) <span class="note">// קמפיינים + תשתית</span>
+<span class="br">│        └─</span> brands · special · glglz · october7th ...
+<span class="br">│</span>
+<span class="br">└──</span> <span class="tag2">Mail</span> &#8594; חיצוני <span class="note">// אין MX על n12 - כנראה mako.co.il</span>
+    </div>
+    <p>מתוך שם דומיין אחד הגענו ל: בעלות מאומתת, שני ספקי תשתית (Bezeq + Akamai), שכבת הגנה (Radware), מנוע אפליקציה (mako), מבנה תעודות, ותצורת דואר. <span class="hl">זה ההבדל בין "מצאתי IP" ל"הבנתי איך הארגון בנוי".</span></p>
+  </div>
+</section>
+
+<!-- HOW TO CONTINUE -->
+<section>
+  <div class="wrap">
+    <div class="sec-head"><span class="sec-num">05</span><h2>איך ממשיכים מכאן (פסיבי בלבד)</h2></div>
+    <p class="sec-sub">השלבים הבאים שמרחיבים את התמונה - בלי לעבור לסריקה אקטיבית או חודרנית.</p>
+
+    <div class="term">
+      <div class="term-bar"><span class="b r"></span><span class="b y"></span><span class="b g"></span><span class="name">TXT / SPF / DMARC</span><button class="copy">העתק</button></div>
+<pre><span class="prompt">$</span> dig <span class="key">TXT</span> n12.co.il       <span class="cmt"># SPF, אימותי SaaS, verification</span>
+<span class="prompt">$</span> dig <span class="key">TXT</span> _dmarc.n12.co.il   <span class="cmt"># מדיניות DMARC</span></pre>
+    </div>
+    <div class="box next">
+      <div class="bt">מה זה יחשוף</div>
+      <ul>
+        <li><b>SPF:</b> אילו שרתים מורשים לשלוח מייל בשם הארגון - חושף ספקי SaaS (Google, Microsoft, SendGrid...)</li>
+        <li><b>Verification records:</b> אסימוני אימות חושפים אילו שירותי ענן הארגון משתמש בהם</li>
+        <li><b>DMARC:</b> מדיניות אכיפה מול דיוג</li>
+      </ul>
+    </div>
+
+    <div class="box next">
+      <div class="bt">כלים פסיביים נוספים</div>
+      <ul>
+        <li><b>crt.sh / Certificate Transparency:</b> גילוי תתי-דומיינים מתוך תעודות שהונפקו פומבית</li>
+        <li><b>bgp.he.net:</b> כל הבלוקים תחת AS8551 - מיפוי כל רשת הספק</li>
+        <li><b>httpx + tech-detect:</b> זיהוי טכנולוגיות על כל ה-13 subs (nginx/Apache/React/WordPress)</li>
+        <li><b>Wappalyzer / whatweb:</b> טביעת אצבע של מחסנית הטכנולוגיה</li>
+        <li><b>Wayback Machine:</b> גרסאות היסטוריות שחושפות endpoints ישנים</li>
+      </ul>
+    </div>
+
+    <div class="box risk">
+      <div class="bt">הקו האדום</div>
+      <p>כל מה שמעבר - סריקת פורטים (nmap), fuzzing של נתיבים, ניסיון גישה ל-endpoints, או בדיקת חולשות - הוא <b>סריקה אקטיבית</b> ודורש אישור כתוב מבעל הנכס. החקירה הפסיבית עוצרת כאן.</p>
+    </div>
+  </div>
+</section>
+
+<!-- WHAT TO DO WITH FINDINGS -->
+<section id="use">
+  <div class="wrap">
+    <div class="sec-head"><span class="sec-num">06</span><h2>מה עושים עם המידע - והמשך החקירה</h2></div>
+    <p class="sec-sub">ה-Recon נתן לנו מפת פרימטר. עכשיו מתרגמים כל ממצא ל"מה לבדוק הלאה". לפני הכל - הבנת איפה אנחנו על ציר התהליך המקצועי.</p>
+
+    <p>בדיקת חדירות מקצועית בנויה משלבים. כל מה שעשינו עד כה הוא <b>שלב אחד</b> בלבד - הפסיבי. כל שלב שאחריו דורש אישור כתוב:</p>
+
+    <div class="phases">
+      <div class="phase passive"><div class="pn">01</div><div class="pt">Recon</div><div class="pd">פסיבי. מקורות פומביים. מה שעשינו: WHOIS, DNS, CT, headers, TLS.</div></div>
+      <div class="phase gated"><span class="lock">&#128274;</span><div class="pn">02</div><div class="pt">Enumeration</div><div class="pd">אקטיבי. port scan, dir brute, זיהוי שירותים. דורש אישור.</div></div>
+      <div class="phase gated"><span class="lock">&#128274;</span><div class="pn">03</div><div class="pt">Vuln Assessment</div><div class="pd">זיהוי חולשות בפועל מול היעד. דורש אישור.</div></div>
+      <div class="phase gated"><span class="lock">&#128274;</span><div class="pn">04</div><div class="pt">Exploitation</div><div class="pd">ניצול מבוקר להוכחת השפעה. דורש אישור והגדרת scope.</div></div>
+      <div class="phase"><div class="pn">05</div><div class="pt">Reporting</div><div class="pd">תיעוד, ראיות, המלצות הקשחה ללקוח.</div></div>
+    </div>
+
+    <p>וכך כל ממצא פסיבי שכבר יש בידינו מזין את השלבים הבאים. <span class="hl">ממצא &#8592; מה הוא פותח</span>:</p>
+
+    <div class="maprow"><div class="f">13 תתי-דומיינים (<b>subfinder</b>)</div><div class="arrow2">&#8592;</div><div class="a">להעביר ל-httpx ולמפות אילו חיים, אילו עוקפים את ה-CDN ומצביעים ישר ל-origin, ואילו ישנים ונטושים (קמפיינים) - מועמדים לקוד לא מתוחזק.</div></div>
+    <div class="maprow"><div class="f">Akamai + Radware (CDN/WAF)</div><div class="arrow2">&#8592;</div><div class="a">המטרה האמיתית: למצוא את ה-origin המוסתר. דרכים פסיביות - היסטוריית DNS (passive DNS), ה-IP של שרת המייל, includes ב-SPF, ותעודות SAN על IP ישיר.</div></div>
+    <div class="maprow"><div class="f">AS8551 (<b>whois IP</b>)</div><div class="arrow2">&#8592;</div><div class="a">למפות את כל בלוקי ה-IP של הארגון דרך bgp.he.net - להרחיב מ-IP בודד לכל הרשת ולמצוא נכסים סמוכים.</div></div>
+    <div class="maprow"><div class="f">אין MX + רשומות TXT/SPF</div><div class="arrow2">&#8592;</div><div class="a">לזהות את ספק הדואר ואת ספקי ה-SaaS המורשים - מיפוי סיכון צד שלישי (third-party risk) ומשטח לדיוג.</div></div>
+    <div class="maprow"><div class="f">תעודת Wildcard + CT logs</div><div class="arrow2">&#8592;</div><div class="a">לחפש ב-crt.sh hostnames ספציפיים שהונפקו - מקור פסיבי לתתי-דומיינים שלא עלו ב-subfinder.</div></div>
+    <div class="maprow"><div class="f">66.22.84.58 (שכבת Apex)</div><div class="arrow2">&#8592;</div><div class="a">whois על ה-IP כדי לזהות את ספק ההגנה ולהבין את מודל ההגנה לפני כל צעד נוסף.</div></div>
+  </div>
+</section>
+
+<!-- VULNERABILITIES + THREAT DETECTION -->
+<section id="exploit">
+  <div class="wrap">
+    <div class="sec-head"><span class="sec-num">07</span><h2>ממיפוי לחולשות - וזיהוי איומים</h2></div>
+    <p class="sec-sub">הפרק הזה מסביר את ההיגיון: אילו מחלקות חולשה ה-Recon כבר רמז עליהן, ומה ההקשחה מולן. זו מתודולוגיה - לא מדריך תקיפה. בדיקה בפועל מול נכס דורשת אישור כתוב.</p>
+
+    <div class="ethics">
+      <div class="ic">&#9888;</div>
+      <div>
+        <h4>לפני שממשיכים</h4>
+        <p>החומר הבא מתאר <b>מחלקות חולשה</b> ו<b>אמצעי הקשחה</b> כפי שמלמדים בקורסי הגנה ובדיקות חדירות מורשות. אין כאן payloads, אין קוד ניצול, ואין הוראות תקיפה על נכס חי. כל ניסיון בדיקה אקטיבית מותר רק על מערכת שבבעלותכם או עם אישור כתוב ו-scope מוגדר.</p>
+      </div>
+    </div>
+
+    <h3 style="font-family:var(--serif);font-size:24px;color:#eaf2f9;margin:30px 0 6px">מה ה-Recon כבר חשף - לפי מחלקת חולשה</h3>
+    <p style="color:var(--text-dim);font-size:15px;margin-bottom:8px">לכל אחת: הסיגנל שראינו &#8594; הסיכון &#8594; ההקשחה.</p>
+
+    <div class="box risk">
+      <div class="bt">DNSSEC unsigned</div>
+      <ul>
+        <li><b>הסיגנל:</b> ה-WHOIS הראה <span class="inline-code">DNSSEC: unsigned</span></li>
+        <li><b>הסיכון:</b> אין חתימה קריפטוגרפית על ה-DNS - cache poisoning ו-DNS spoofing מול resolvers ריאליים יותר</li>
+        <li><b>הקשחה:</b> לחתום את ה-zone (DNSSEC) ולוודא שרשרת אמון תקינה מה-TLD</li>
+      </ul>
+    </div>
+
+    <div class="box risk">
+      <div class="bt">Subdomain Takeover</div>
+      <ul>
+        <li><b>הסיגנל:</b> תתי-דומיינים ישנים של קמפיינים (october7th, kipur, ironswordslist)</li>
+        <li><b>הסיכון:</b> CNAME "תלוי" (dangling) שמצביע למשאב ענן שבוטל - תוקף יכול לרשום אותו מחדש ולהשתלט על הסאב-דומיין</li>
+        <li><b>הקשחה:</b> ביקורת תקופתית של רשומות DNS, הסרת CNAME-ים תלויים, asset inventory</li>
+      </ul>
+    </div>
+
+    <div class="box risk">
+      <div class="bt">CDN / WAF Bypass (Origin Exposure)</div>
+      <ul>
+        <li><b>הסיגנל:</b> www מאחורי Akamai, אבל ה-Apex על IP נפרד (66.22.84.58)</li>
+        <li><b>הסיכון:</b> אם ה-origin האמיתי דלף (היסטוריית DNS / מייל) - אפשר לעקוף את ה-WAF ולפנות ישירות לשרת</li>
+        <li><b>הקשחה:</b> firewall ב-origin שמקבל תעבורה רק מטווחי ה-CDN, ולא מהאינטרנט הפתוח</li>
+      </ul>
+    </div>
+
+    <div class="box risk">
+      <div class="bt">Information Disclosure (Headers)</div>
+      <ul>
+        <li><b>הסיגנל:</b> כותרות חושפות מנוע (<span class="inline-code">mako-render</span>). לא ראינו גרסת שרת - וזה טוב</li>
+        <li><b>הסיכון:</b> כותרות כמו <span class="inline-code">X-Powered-By: PHP/7.2</span> מאפשרות לתוקף לכוון חולשות לגרסה ידועה</li>
+        <li><b>הקשחה:</b> להסיר/לטשטש כותרות גרסה, להחזיר banners מינימליים</li>
+      </ul>
+    </div>
+
+    <div class="box risk">
+      <div class="bt">Email Spoofing / Phishing</div>
+      <ul>
+        <li><b>הסיגנל:</b> אין MX על n12, ותצורת SPF/DMARC נבדקת ב-<span class="inline-code">dig TXT</span></li>
+        <li><b>הסיכון:</b> SPF חלש או DMARC ב-<span class="inline-code">p=none</span> מאפשרים זיוף מייל בשם הארגון</li>
+        <li><b>הקשחה:</b> SPF הדוק, DMARC ב-<span class="inline-code">p=reject</span>, ו-DKIM</li>
+      </ul>
+    </div>
+
+    <div class="box risk">
+      <div class="bt">Shadow IT / Forgotten Assets</div>
+      <ul>
+        <li><b>הסיגנל:</b> 13 תתי-דומיינים, חלקם קמפיינים זמניים שכנראה לא מתוחזקים</li>
+        <li><b>הסיכון:</b> מערכות נשכחות עם קוד ישן ופגיע = הנקודה הרכה ביותר במשטח התקיפה</li>
+        <li><b>הקשחה:</b> Attack Surface Management - מצאי נכסים מתמשך, סריקות ביקורת מורשות, הוצאה משימוש מסודרת</li>
+      </ul>
+    </div>
+
+    <div class="divider"></div>
+
+    <h3 style="font-family:var(--serif);font-size:24px;color:#eaf2f9;margin:30px 0 6px">הצד השני - DNS כזיהוי איומים ונוזקות (Blue Team)</h3>
+    <p style="color:var(--text-dim);font-size:15px;margin-bottom:8px">אותם כלים בדיוק משמשים להגנה: לזהות תשתית זדונית שמתחזה לארגון או תוקפת אותו.</p>
+
+    <div class="box next">
+      <div class="bt">איתור דומיינים מתחזים (Typosquatting / Phishing)</div>
+      <ul>
+        <li>חיפוש דומיינים דומים שנרשמו (n12-news.com, n12-co.il, nl2.co.il) - אלה משמשים לדיוג ולהפצת נוזקות בשם הארגון</li>
+        <li>כלים: dnstwist, urlcrazy - מייצרים וריאציות ובודקים אילו רשומות בפועל</li>
+      </ul>
+    </div>
+
+    <div class="box next">
+      <div class="bt">ניטור Certificate Transparency</div>
+      <ul>
+        <li>מעקב אחרי crt.sh על הדומיינים שלכם - תעודה שהונפקה ל-hostname שאתם לא מכירים = סימן אזהרה לתשתית מתחזה או לפריצה</li>
+      </ul>
+    </div>
+
+    <div class="box next">
+      <div class="bt">Passive DNS לזיהוי תשתית זדונית</div>
+      <ul>
+        <li>בדיקת רשומות היסטוריות וקשרי IP&#8596;Domain כדי לזהות דפוסי C2, fast-flux, או IP שמשרת גם דומיין זדוני ידוע</li>
+        <li>אינטגרציה עם threat intel feeds כדי לסמן נכסים חשודים</li>
+      </ul>
+    </div>
+
+    <div class="box risk">
+      <div class="bt">תזכורת קבועה - הקו שלא חוצים</div>
+      <p>כל מה שבפרק הזה הוא ידע מתודולוגי להגנה ולבדיקות מורשות בלבד. ניצול חולשה, החדרת קוד, או גישה לא מורשית למערכת חיה - אסורים ללא בעלות או אישור כתוב עם scope. בחקירה שלנו עצרנו בשלב הפסיבי במכוון.</p>
+    </div>
+  </div>
+</section>
+
+<!-- MISSION -->
+<section id="mission">
+  <div class="wrap">
+    <div class="sec-head"><span class="sec-num">08</span><h2>משימת כיתה</h2></div>
+    <p class="sec-sub">עכשיו תורכם. בחרו אתר ציבורי גדול אחד מהרשימה (או אתר ישראלי ציבורי אחר לבחירתכם) ובצעו עליו את החקירה המלאה.</p>
+
+    <div class="mission">
+      <span class="mtag">Lab Assignment · Passive Recon</span>
+      <h3>מ-Apex ל-Infrastructure Map</h3>
+      <p style="color:var(--text-dim)">המטרה: לקחת דומיין שלא חקרתם, ולעקוב אחרי אותה שרשרת בדיוק - מ-WHOIS ועד TLS - ולבנות מפת תשתית מלאה. בלי לחזור על n12.co.il.</p>
+
+      <div class="targets">
+        <span class="t">ynet.co.il</span>
+        <span class="t">walla.co.il</span>
+        <span class="t">gov.il</span>
+        <span class="t">calcalist.co.il</span>
+        <span class="t">one.co.il</span>
+        <span class="t">(או אתר ציבורי אחר)</span>
+      </div>
+
+      <ol class="tasklist">
+        <li><b>מבנה השם:</b> פרקו את הדומיין לרמות (Root / TLD / Public Suffix / Apex). הסבירו מה ה-Apex המדויק.</li>
+        <li><b>בעלות:</b> הריצו <span class="inline-code">whois</span> וזהו: בעלים, registrar, Name Servers, ותאריך תפוגה.</li>
+        <li><b>Authoritative NS:</b> אמתו עצמאית עם <span class="inline-code">dig NS</span> ומצאו את ה-IP של אחד מהם.</li>
+        <li><b>ASN:</b> הריצו <span class="inline-code">whois</span> על ה-IP. מהו ה-ASN ובעל הרשת? האם זה ספק מקומי או ענן בינלאומי?</li>
+        <li><b>Reverse + MX:</b> בדקו <span class="inline-code">dig -x</span> ו-<span class="inline-code">dig MX</span>. האם יש שרת דואר? אם כן, של מי?</li>
+        <li><b>Subdomains:</b> הריצו <span class="inline-code">subfinder</span>. כמה מצאתם? אילו נראים תשתית ואילו קמפיינים?</li>
+        <li><b>CDN + Headers:</b> <span class="inline-code">dig CNAME www</span> + <span class="inline-code">curl -I</span>. זהו CDN, WAF ושכבת אפליקציה.</li>
+        <li><b>TLS:</b> <span class="inline-code">openssl s_client</span>. מי ה-CA? האם wildcard? מה ה-IP של ה-edge?</li>
+        <li><b>השוואה:</b> האם ה-Apex וה-www יושבים על אותה תשתית, או נפרדת כמו אצל n12?</li>
+        <li><b>מהשורש:</b> הריצו <span class="inline-code">dig +trace DOMAIN @8.8.8.8</span> והראו את השרשרת Root &#8594; TLD &#8594; authoritative. מה סטטוס ה-DNSSEC?</li>
+        <li><b>מחלקת חולשה אחת:</b> מתוך הממצאים, זהו מחלקת חולשה פוטנציאלית אחת (DNSSEC / takeover / origin exposure / SPF) ורשמו את ההקשחה המתאימה. תיאורטי בלבד - בלי בדיקה אקטיבית.</li>
+        <li><b>הרחבה:</b> בחרו צעד פסיבי אחד נוסף (crt.sh / TXT-SPF / bgp.he.net) ותארו מה גיליתם.</li>
+      </ol>
+
+      <div class="deliverable">
+        <div class="dh">תוצר נדרש</div>
+        <p style="margin:0;color:var(--text)">מפת תשתית בפורמט עץ (כמו זו של n12) + טבלת ממצאים מרוכזת. בנוסף, פסקה אחת: <b>מהו הממצא המודיעיני המעניין ביותר שגיליתם, ולמה.</b> בונוס: מצאו הבדל אחד בארכיטקטורה בין היעד שלכם ל-n12.co.il.</p>
+      </div>
+    </div>
+
+    <div class="ethics">
+      <div class="ic">&#9888;</div>
+      <div>
+        <h4>תזכורת לפני שמתחילים</h4>
+        <p>בחרו רק נכסים ציבוריים גדולים. כל הפעולות חייבות להישאר פסיביות (WHOIS / DNS / TLS / כותרות בלבד). אסור nmap, אסור fuzzing, אסור ניסיון גישה. אם בספק - אל תריצו.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <div class="fbrand">RECON_LAB · <b>DNS Intelligence &amp; Passive OSINT</b></div>
+    <div class="fnote">חומר הדרכה · חקירה פסיבית של מקורות פומביים בלבד · כל הזכויות לתוכן ההדרכה שמורות</div>
+  </div>
+</footer>
+
+<script>
+// progress bar
+const prog=document.getElementById('prog');
+addEventListener('scroll',()=>{
+  const h=document.documentElement;
+  const p=h.scrollTop/(h.scrollHeight-h.clientHeight)*100;
+  prog.style.width=p+'%';
+},{passive:true});
+
+// copy buttons
+document.querySelectorAll('.copy').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    const pre=btn.closest('.term').querySelector('pre');
+    const txt=pre.innerText.replace(/^\$ /gm,'').trim();
+    navigator.clipboard.writeText(txt).then(()=>{
+      const o=btn.textContent;btn.textContent='הועתק ✓';btn.style.color='var(--green)';
+      setTimeout(()=>{btn.textContent=o;btn.style.color='';},1400);
+    }).catch(()=>{});
+  });
+});
+
+// reveal steps
+const io=new IntersectionObserver((es)=>{
+  es.forEach(e=>{if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target);}});
+},{threshold:.12});
+document.querySelectorAll('.step').forEach(s=>io.observe(s));
+</script>
+</body>
+</html>
