@@ -154,6 +154,41 @@ p code,li code,.inline-code{font-family:var(--mono);font-size:.9em;background:va
 .maprow .a{padding:14px 18px;background:var(--panel);font-size:14.5px;color:var(--text-dim)}
 @media(max-width:640px){.maprow{grid-template-columns:1fr;direction:rtl}.maprow .arrow2{transform:rotate(90deg);border:none;padding:4px 0}}
 
+/* record-type card accents */
+.def.c-soa{border-right-color:#f472b6} .def.c-soa .code{color:#f472b6}
+.def.c-aaaa{border-right-color:var(--green)} .def.c-aaaa .code{color:var(--green)}
+.def.c-mx{border-right-color:var(--amber)} .def.c-mx .code{color:var(--amber)}
+.def.c-ns2{border-right-color:var(--cyan)} .def.c-ns2 .code{color:var(--cyan)}
+.def.c-ptr{border-right-color:var(--violet)} .def.c-ptr .code{color:var(--violet)}
+.def.c-txt{border-right-color:#7dd3fc} .def.c-txt .code{color:#7dd3fc}
+
+/* SOA field breakdown */
+.soatbl{border:1px solid var(--line);border-radius:12px;overflow:hidden;margin:22px 0}
+.soatbl .sr{display:grid;grid-template-columns:150px 140px 1fr;border-bottom:1px solid var(--line);direction:rtl}
+.soatbl .sr:last-child{border-bottom:none}
+.soatbl .sr:hover{background:rgba(34,211,238,.025)}
+.soatbl .sr.head{background:var(--panel-2);font-family:var(--mono);font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-dim)}
+.soatbl .sc{padding:11px 16px;font-size:14px}
+.soatbl .sc.f{font-family:var(--mono);color:#f472b6;font-size:13px;direction:ltr;text-align:left}
+.soatbl .sc.v{font-family:var(--mono);color:var(--cyan);font-size:13px;direction:ltr;text-align:left}
+.soatbl .sc.m{color:var(--text-dim)}
+.soatbl .sr.head .sc{color:var(--text-dim)}
+@media(max-width:640px){.soatbl .sr{grid-template-columns:1fr}.soatbl .sc.f,.soatbl .sc.v{text-align:right}.soatbl .sr.head{display:none}}
+
+/* resolution flow */
+.resflow{margin:24px 0;direction:rtl;border:1px solid var(--line);border-radius:14px;padding:8px 22px;background:var(--panel-2)}
+.rq{display:flex;gap:14px;align-items:flex-start;padding:16px 0;border-bottom:1px dashed var(--line)}
+.rq:last-child{border-bottom:none}
+.rq .who{flex-shrink:0;font-family:var(--mono);font-size:11px;font-weight:700;color:var(--bg);background:var(--cyan);padding:7px 10px;border-radius:9px;min-width:96px;text-align:center;line-height:1.3}
+.rq .who.r2{background:var(--violet)}
+.rq .who.r3{background:var(--amber)}
+.rq .who.r4{background:var(--green)}
+.rq .body2{flex:1}
+.rq .ask{color:var(--text);font-size:15px;font-weight:600}
+.rq .ans{color:var(--text-dim);font-size:14px;margin-top:5px;border-right:2px solid var(--line-2);padding-right:12px}
+.rq .ans b{color:var(--green)}
+.rq .ans .ref{color:var(--amber);font-weight:600}
+
 /* chain */
 .chain{display:flex;flex-direction:column;gap:0;margin:26px 0;direction:ltr}
 .chain .node{display:flex;align-items:center;gap:16px}
@@ -268,6 +303,7 @@ footer .fnote{color:var(--text-faint);font-size:13px;margin-top:10px;font-family
     <div class="brand"><span class="dot"></span>RECON_LAB · <b>DNS Intelligence</b></div>
     <div class="links">
       <a href="#concept">מבנה</a>
+      <a href="#records">רשומות</a>
       <a href="#whois">WHOIS</a>
       <a href="#dns">DNS</a>
       <a href="#enum">Enum</a>
@@ -403,10 +439,120 @@ footer .fnote{color:var(--text-faint);font-size:13px;margin-top:10px;font-family
 
 <div class="divider wrap" style="max-width:1000px;margin:0 auto;padding:0 24px"></div>
 
+<!-- DNS RECORDS & RESOLUTION -->
+<section id="records">
+  <div class="wrap">
+    <div class="sec-head"><span class="sec-num">02</span><h2>רשומות DNS ותהליך הפתרון</h2></div>
+    <p class="sec-sub">לפני החקירה המעשית - הבסיס: אילו סוגי רשומות קיימים, מי שואל את מי כשפותרים שם, ואיזה מידע יוצא מכל אחד. כל הדוגמאות מעוגנות בנתונים האמיתיים של n12.co.il.</p>
+
+    <p>שני תהליכים נפרדים רצים בזה אחר זה, וחשוב לא לבלבל ביניהם. <span class="hl">DHCP</span> הוא ה-bootstrap - איך המחשב מקבל זהות ולומד את מי לשאול. <span class="hl">DNS</span> הוא ה-resolution - איך, אחרי שיש לו זהות, הוא מתרגם שמות לכתובות. החיבור: שלב ה-Offer/Ack של DHCP כולל גם את כתובת ה-DNS Server (זה DHCP Option 6). כלומר DHCP נותן לך IP - וגם אומר לך מי ה-resolver שלך.</p>
+
+    <div class="phases">
+      <div class="phase"><div class="pn">D</div><div class="pt">Discover</div><div class="pd">הלקוח (0.0.0.0:68) משדר Broadcast ל-255.255.255.255:67 - "יש פה DHCP?"</div></div>
+      <div class="phase"><div class="pn">O</div><div class="pt">Offer</div><div class="pd">השרת מציע IP + Subnet + Gateway + <b style="color:var(--cyan)">DNS</b> + Lease</div></div>
+      <div class="phase"><div class="pn">R</div><div class="pt">Request</div><div class="pd">הלקוח משדר בקשה להצעה שבחר (Broadcast, כדי ששאר השרתים יידעו)</div></div>
+      <div class="phase passive"><div class="pn">A</div><div class="pt">Acknowledge</div><div class="pd">השרת מאשר, רושם ב-Leases. עכשיו ללקוח יש IP <b>ו-resolver</b></div></div>
+    </div>
+    <p style="font-size:14.5px;color:var(--text-faint)">הערה: בין Request ל-Ack הלקוח לרוב עושה ARP probe לוודא שאף אחד לא משתמש כבר ב-IP. מהרגע הזה מתחיל ה-DNS.</p>
+
+    <h3 style="font-family:var(--serif);font-size:24px;color:#eaf2f9;margin:34px 0 6px">תהליך ה-Resolution - מי שואל את מי</h3>
+    <p style="color:var(--text-dim);font-size:15px;margin-bottom:6px">המחשב מריץ <b>stub resolver</b> טיפש שלא חוקר בעצמו. הוא מטיל את כל העבודה על ה-<b>recursive resolver</b>. ההבדל: ה-stub מבקש תשובה מוגמרת (recursive), וה-resolver אוסף אותה צעד-צעד (iterative).</p>
+
+    <div class="resflow">
+      <div class="rq"><span class="who r4">Stub<br>(המחשב)</span><div class="body2"><div class="ask">"תפתור לי את n12.co.il, אני מחכה לתשובה סופית"</div><div class="ans">שאילתה <b>recursive</b> אל ה-resolver. ה-stub לא ימשיך לבד.</div></div></div>
+      <div class="rq"><span class="who r2">Recursive<br>Resolver</span><div class="body2"><div class="ask">שואל את שרת ה-Root: "מי אחראי על n12.co.il?"</div><div class="ans">ה-Root לא יודע, מחזיר <span class="ref">referral</span>: "פנה לשרתי ה-TLD של .il"</div></div></div>
+      <div class="rq"><span class="who r3">TLD<br>(.il)</span><div class="body2"><div class="ask">ה-resolver שואל את שרתי .il אותה שאלה</div><div class="ans">גם הם לא יודעים, מחזירים <span class="ref">referral</span>: "ns1/2/3.bezeqint.net אחראים"</div></div></div>
+      <div class="rq"><span class="who">Authoritative<br>(bezeqint)</span><div class="body2"><div class="ask">ה-resolver שואל את ה-authoritative</div><div class="ans">מחזיר <b>answer</b> סופי: <span style="font-family:var(--mono);direction:ltr;display:inline-block">66.22.84.58</span></div></div></div>
+      <div class="rq"><span class="who r2">Recursive<br>Resolver</span><div class="body2"><div class="ask">מחזיר את התשובה ל-stub, ושומר במטמון (לפי ה-TTL)</div><div class="ans">בפעם הבאה שמישהו ישאל - יענה ישר מהמטמון, בלי לחזור על השרשרת</div></div></div>
+    </div>
+
+    <h3 style="font-family:var(--serif);font-size:24px;color:#eaf2f9;margin:34px 0 6px">סוגי הרשומות</h3>
+    <p style="color:var(--text-dim);font-size:15px;margin-bottom:8px">לכל סוג: מה הוא, ומה אפשר להוציא ממנו. ארבעת הראשונים הם מה שביקשת; הוספתי את A/AAAA/PTR מהתמונה כדי שהמודול יהיה שלם.</p>
+
+    <div class="defs">
+      <div class="def c-soa">
+        <div class="dt"><span class="code">SOA</span><span class="en">Start of Authority</span></div>
+        <p>רשומה אחת ויחידה בראש כל zone. לא מצביעה על שירות - מגדירה את הזון עצמו ואת כללי השכפול בין שרתים. תמיד מופיעה בתשובות שליליות. מודיעין: שרת ראשי, אימייל אחראי, ותאריך שינוי אחרון (מ-Serial).</p>
+      </div>
+      <div class="def c-ns2">
+        <div class="dt"><span class="code">NS</span><span class="en">Name Server</span></div>
+        <p>רשומות האצלה - מי סמכותי על הזון. קיימות גם באב (.il) וגם בזון עצמו, וצריכות להתאים (אחרת lame delegation). מודיעין: מי מארח את ה-DNS, יתירות, ונקודת קפיצה ל-IP &#8594; ASN.</p>
+      </div>
+      <div class="def c-reg">
+        <div class="dt"><span class="code">A / AAAA</span><span class="en">Address</span></div>
+        <p>מיפוי שם &#8594; כתובת IP. <span class="inline-code" style="direction:ltr">A</span> ל-IPv4, <span class="inline-code" style="direction:ltr">AAAA</span> ל-IPv6. מודיעין: איפה השירות יושב, ואם הוא מאחורי CDN (ה-IP יהיה של הספק, לא ה-origin).</p>
+      </div>
+      <div class="def c-mx">
+        <div class="dt"><span class="code">MX</span><span class="en">Mail Exchange</span></div>
+        <p>מצביע על שרת ה-SMTP שמקבל דואר לדומיין, עם priority. מודיעין: ספק הדואר (Google/Microsoft/עצמי). אצל n12 אין MX - הדואר במקום אחר.</p>
+      </div>
+      <div class="def c-ptr">
+        <div class="dt"><span class="code">PTR</span><span class="en">Pointer (Reverse)</span></div>
+        <p>הכיוון ההפוך: IP &#8594; שם. יושב תחת <span class="inline-code" style="direction:ltr">in-addr.arpa</span>. חשוב למוניטין SMTP. מודיעין: naming convention ומבנה תשתית.</p>
+      </div>
+      <div class="def c-txt">
+        <div class="dt"><span class="code">TXT</span><span class="en">Text</span></div>
+        <p>טקסט חופשי. בפועל מחזיק SPF, DKIM, DMARC ו-verification tokens. מודיעין עשיר: אילו ספקי SaaS הארגון מאמת מולם, ומדיניות הגנת המייל שלו.</p>
+      </div>
+    </div>
+
+    <h3 style="font-family:var(--serif);font-size:24px;color:#eaf2f9;margin:34px 0 6px">פירוק שדות ה-SOA</h3>
+    <p style="color:var(--text-dim);font-size:15px;margin-bottom:4px">הנתון האמיתי של היעד:</p>
+    <div class="term"><div class="term-bar"><span class="b r"></span><span class="b y"></span><span class="b g"></span><span class="name">dig SOA n12.co.il</span><button class="copy">העתק</button></div>
+<pre>n12.co.il. SOA ns1.bezeqint.net. hostmaster.keshet.dom.
+           <span class="key">2020101201</span> <span class="flag">900 600 86400 3600</span></pre></div>
+    <div class="soatbl">
+      <div class="sr head"><div class="sc">שדה</div><div class="sc">ערך</div><div class="sc">משמעות</div></div>
+      <div class="sr"><div class="sc f">MNAME</div><div class="sc v">ns1.bezeqint.net</div><div class="sc m">השרת הראשי (primary) של הזון - ממנו המשניים מושכים עדכונים</div></div>
+      <div class="sr"><div class="sc f">RNAME</div><div class="sc v">hostmaster.keshet.dom</div><div class="sc m">אימייל האחראי. הנקודה הראשונה = @ &#8594; hostmaster@keshet.dom. הסיומת .dom פנימית (ממצא OSINT)</div></div>
+      <div class="sr"><div class="sc f">Serial</div><div class="sc v">2020101201</div><div class="sc m">גרסת הזון. פורמט תאריך: 2020-10-12 רוויזיה 01. הזון לא השתנה מאוקטובר 2020</div></div>
+      <div class="sr"><div class="sc f">Refresh</div><div class="sc v">900</div><div class="sc m">כל 15 דק' המשני בודק אצל הראשי אם יש שינוי</div></div>
+      <div class="sr"><div class="sc f">Retry</div><div class="sc v">600</div><div class="sc m">אם הבדיקה נכשלה - ינסה שוב בעוד 10 דק'</div></div>
+      <div class="sr"><div class="sc f">Expire</div><div class="sc v">86400</div><div class="sc m">אם המשני לא הצליח להגיע לראשי 24 שעות - מפסיק לענות</div></div>
+      <div class="sr"><div class="sc f">Minimum</div><div class="sc v">3600</div><div class="sc m">Negative caching TTL: כמה זמן לשמור תשובות "לא קיים" (שעה)</div></div>
+    </div>
+
+    <h3 style="font-family:var(--serif);font-size:24px;color:#eaf2f9;margin:34px 0 6px">NXDOMAIN לעומת NODATA - ההבחנה הקריטית</h3>
+    <p style="color:var(--text-dim);font-size:15px;margin-bottom:4px">NXDOMAIN הוא <b>לא רשומה</b> - זה קוד תגובה (RCODE 3). כאן רוב האנשים טועים, כי יש שלושה מצבים שונים לחלוטין:</p>
+    <table class="tbl">
+      <tr><th>מצב</th><th>מה זה אומר</th><th>דוגמה</th></tr>
+      <tr><td><span class="v">NOERROR + answer</span></td><td>השם קיים ויש לו את הסוג שביקשת</td><td><span class="v">dig A www.n12.co.il</span></td></tr>
+      <tr><td><span class="v">NOERROR + 0 (NODATA)</span></td><td>השם <b style="color:var(--amber)">קיים</b>, אבל אין לו את הסוג הזה</td><td><span class="v">dig MX n12.co.il</span></td></tr>
+      <tr><td><span class="v">NXDOMAIN (RCODE 3)</span></td><td>השם עצמו <b style="color:var(--rose)">לא קיים</b> בכלל</td><td><span class="v">dig A nope.n12.co.il</span></td></tr>
+    </table>
+    <div class="box get">
+      <div class="bt">למה זה חשוב לחקירה</div>
+      <ul>
+        <li>ה-<span class="inline-code">dig MX</span> שלנו החזיר NODATA (NOERROR + SOA), לא NXDOMAIN. כלומר n12.co.il <b>קיים</b> אבל בלי MX - לא "לא קיים"</li>
+        <li>ה-SOA מופיע בתשובה השלילית כדי להגיד ל-resolver כמה זמן לשמור את ה"אין" במטמון</li>
+        <li><b>זיהוי Wildcard:</b> אם כל תת-דומיין אקראי מחזיר NOERROR במקום NXDOMAIN - יש רשומת <span class="inline-code" style="direction:ltr">*</span>, וזה משנה את כל ה-enumeration</li>
+      </ul>
+    </div>
+
+    <h3 style="font-family:var(--serif);font-size:24px;color:#eaf2f9;margin:34px 0 6px">nslookup - הכלי</h3>
+    <p style="color:var(--text-dim);font-size:15px;margin-bottom:4px">הדבר הקריטי: <b>אתה בוחר את מי לשאול</b> (הארגומנט השני). זה ההבדל בין אמת מהמקור לבין מה שהעולם רואה ממטמון.</p>
+    <div class="term"><div class="term-bar"><span class="b r"></span><span class="b y"></span><span class="b g"></span><span class="name">nslookup</span><button class="copy">העתק</button></div>
+<pre><span class="prompt">$</span> nslookup n12.co.il <span class="flag">192.115.132.132</span>   <span class="cmt"># שאלנו את ה-authoritative ישירות</span>
+Address: <span class="str">66.22.84.58</span>                       <span class="cmt"># אמת מהמקור, בלי cache</span>
+
+<span class="prompt">$</span> nslookup n12.co.il <span class="flag">8.8.8.8</span>           <span class="cmt"># resolver רקורסיבי - מה שהעולם רואה</span></pre></div>
+    <div class="box next">
+      <div class="bt">nslookup מול dig</div>
+      <ul>
+        <li>ל-Recon עדיף <span class="inline-code">dig</span>: מראה RCODE, flags, חלוקת sections (ANSWER/AUTHORITY/ADDITIONAL) ו-TTL מדויק</li>
+        <li><span class="inline-code">nslookup</span> נותן פלט מקוצר ומסתיר חלק מהמידע - אבל זמין כברירת מחדל בכל Windows, ולכן שימושי בשטח</li>
+        <li>מצב אינטראקטיבי: <span class="inline-code">set type=NS</span>, <span class="inline-code">set type=SOA</span>, <span class="inline-code">server 8.8.8.8</span></li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<div class="divider wrap" style="max-width:1000px;margin:0 auto;padding:0 24px"></div>
+
 <!-- STEP 1 WHOIS -->
 <section id="whois">
   <div class="wrap">
-    <div class="sec-head"><span class="sec-num">02</span><h2>שלב אחר שלב: החקירה המלאה</h2></div>
+    <div class="sec-head"><span class="sec-num">03</span><h2>שלב אחר שלב: החקירה המלאה</h2></div>
     <p class="sec-sub">לכל שלב: המטרה, הפקודה המדויקת, הפלט, מה קיבלנו ממנו, ואיך ממשיכים. עוקבים אחרי השרשרת מלמעלה למטה.</p>
 
     <div class="step">
@@ -732,7 +878,7 @@ Protocol: <span class="key">TLSv1.3</span>  Cipher: TLS_AES_256_GCM_SHA384</pre>
 <!-- SUMMARY TABLE -->
 <section>
   <div class="wrap">
-    <div class="sec-head"><span class="sec-num">03</span><h2>טבלת ממצאים מרוכזת</h2></div>
+    <div class="sec-head"><span class="sec-num">04</span><h2>טבלת ממצאים מרוכזת</h2></div>
     <p class="sec-sub">כל מה שחילצנו ממקור פומבי בלבד, במבט אחד.</p>
     <table class="tbl">
       <tr><th>שכבה</th><th>ממצא</th></tr>
@@ -754,7 +900,7 @@ Protocol: <span class="key">TLSv1.3</span>  Cipher: TLS_AES_256_GCM_SHA384</pre>
 <!-- INFRA MAP -->
 <section id="map">
   <div class="wrap">
-    <div class="sec-head"><span class="sec-num">04</span><h2>מפת תשתית - מה שבנינו</h2></div>
+    <div class="sec-head"><span class="sec-num">05</span><h2>מפת תשתית - מה שבנינו</h2></div>
     <p class="sec-sub">המסר המרכזי: Recon הוא לא "למצוא IP". Recon הוא להבין ארכיטקטורה. הנה התמונה ששרשרת השלבים הרכיבה.</p>
     <div class="infra">
 <span class="root">Keshet Broadcasting (n12.co.il)</span>
@@ -782,7 +928,7 @@ Protocol: <span class="key">TLSv1.3</span>  Cipher: TLS_AES_256_GCM_SHA384</pre>
 <!-- HOW TO CONTINUE -->
 <section>
   <div class="wrap">
-    <div class="sec-head"><span class="sec-num">05</span><h2>איך ממשיכים מכאן (פסיבי בלבד)</h2></div>
+    <div class="sec-head"><span class="sec-num">06</span><h2>איך ממשיכים מכאן (פסיבי בלבד)</h2></div>
     <p class="sec-sub">השלבים הבאים שמרחיבים את התמונה - בלי לעבור לסריקה אקטיבית או חודרנית.</p>
 
     <div class="term">
@@ -820,7 +966,7 @@ Protocol: <span class="key">TLSv1.3</span>  Cipher: TLS_AES_256_GCM_SHA384</pre>
 <!-- WHAT TO DO WITH FINDINGS -->
 <section id="use">
   <div class="wrap">
-    <div class="sec-head"><span class="sec-num">06</span><h2>מה עושים עם המידע - והמשך החקירה</h2></div>
+    <div class="sec-head"><span class="sec-num">07</span><h2>מה עושים עם המידע - והמשך החקירה</h2></div>
     <p class="sec-sub">ה-Recon נתן לנו מפת פרימטר. עכשיו מתרגמים כל ממצא ל"מה לבדוק הלאה". לפני הכל - הבנת איפה אנחנו על ציר התהליך המקצועי.</p>
 
     <p>בדיקת חדירות מקצועית בנויה משלבים. כל מה שעשינו עד כה הוא <b>שלב אחד</b> בלבד - הפסיבי. כל שלב שאחריו דורש אישור כתוב:</p>
@@ -847,7 +993,7 @@ Protocol: <span class="key">TLSv1.3</span>  Cipher: TLS_AES_256_GCM_SHA384</pre>
 <!-- VULNERABILITIES + THREAT DETECTION -->
 <section id="exploit">
   <div class="wrap">
-    <div class="sec-head"><span class="sec-num">07</span><h2>ממיפוי לחולשות - וזיהוי איומים</h2></div>
+    <div class="sec-head"><span class="sec-num">08</span><h2>ממיפוי לחולשות - וזיהוי איומים</h2></div>
     <p class="sec-sub">הפרק הזה מסביר את ההיגיון: אילו מחלקות חולשה ה-Recon כבר רמז עליהן, ומה ההקשחה מולן. זו מתודולוגיה - לא מדריך תקיפה. בדיקה בפועל מול נכס דורשת אישור כתוב.</p>
 
     <div class="ethics">
@@ -953,7 +1099,7 @@ Protocol: <span class="key">TLSv1.3</span>  Cipher: TLS_AES_256_GCM_SHA384</pre>
 <!-- MISSION -->
 <section id="mission">
   <div class="wrap">
-    <div class="sec-head"><span class="sec-num">08</span><h2>משימת כיתה</h2></div>
+    <div class="sec-head"><span class="sec-num">09</span><h2>משימת כיתה</h2></div>
     <p class="sec-sub">עכשיו תורכם. בחרו אתר ציבורי גדול אחד מהרשימה (או אתר ישראלי ציבורי אחר לבחירתכם) ובצעו עליו את החקירה המלאה.</p>
 
     <div class="mission">
